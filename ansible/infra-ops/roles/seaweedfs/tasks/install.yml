@@ -1,0 +1,201 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for seaweedfs/install.yml
+# Stage 4: Installation (Single-Binary Delivery - Defensive Approach)
+#
+# Principles:
+# 1. Inspect existing binary if present: verify valid SeaweedFS format and desired version.
+# 2. If verified and emits desired version and build variant, treat as success and skip re-installation.
+# 3. Download pinned archive with SHA256 checksum verification via get_url (fails fast if URL is invalid).
+# 4. Extract into staging and install to destination search path (/usr/local/bin/weed).
+# 5. Post-install validation of binary version, build variant, and runtime format.
+# 6. Clean up temporary staging artifacts.
+
+- name: Ensure SeaweedFS binary directory exists
+  tags:
+    - seaweedfs
+    - install
+  ansible.builtin.file:
+    path: "{{ seaweedfs_bin_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Probe existing SeaweedFS binary on host
+  tags:
+    - seaweedfs
+    - install
+  ansible.builtin.stat:
+    path: "{{ seaweedfs_bin_dir }}/weed"
+  register: _seaweedfs_binary_stat
+
+- name: Query version of existing SeaweedFS binary
+  tags:
+    - seaweedfs
+    - install
+  ansible.builtin.command:
+    cmd: "{{ seaweedfs_bin_dir }}/weed version"
+  register: _seaweedfs_current_version
+  failed_when: false
+  changed_when: false
+  when:
+    - _seaweedfs_binary_stat.stat.exists
+    - _seaweedfs_binary_stat.stat.isreg
+    - _seaweedfs_binary_stat.stat.executable
+
+- name: Evaluate if existing binary is a valid SeaweedFS executable
+  tags:
+    - seaweedfs
+    - install
+  ansible.builtin.set_fact:
+    _seaweedfs_existing_binary_is_valid: >-
+      {{
+        (_seaweedfs_binary_stat.stat.exists | default(false)) and
+        (_seaweedfs_binary_stat.stat.isreg | default(false)) and
+        (_seaweedfs_binary_stat.stat.executable | default(false)) and
+        (_seaweedfs_current_version.rc | default(-1) == 0) and
+        (_seaweedfs_current_version.stdout_lines | default([]) | length > 0) and
+        (_seaweedfs_current_version.stdout_lines[0].startswith('version '))
+      }}
+
+- name: Evaluate if existing binary satisfies desired version and build variant
+  tags:
+    - seaweedfs
+    - install
+  ansible.builtin.set_fact:
+    _seaweedfs_matches_desired_version: >-
+      {{
+        (_seaweedfs_existing_binary_is_valid | bool) and
+        (_seaweedfs_current_version.stdout_lines[0].split() | length >= 6) and
+        (_seaweedfs_current_version.stdout_lines[0].split()[1] == seaweedfs_expected_volume_limit) and
+        (_seaweedfs_current_version.stdout_lines[0].split()[2] == seaweedfs_version) and
+        (_seaweedfs_current_version.stdout_lines[0].split()[4] == seaweedfs_os) and
+        (_seaweedfs_current_version.stdout_lines[0].split()[5] == seaweedfs_arch)
+      }}
+
+- name: Determine if binary installation or upgrade is required
+  tags:
+    - seaweedfs
+    - install
+  ansible.builtin.set_fact:
+    _seaweedfs_install_needed: "{{ not (_seaweedfs_matches_desired_version | bool) }}"
+
+- name: Report verified existing SeaweedFS binary
+  tags:
+    - seaweedfs
+    - install
+  ansible.builtin.debug:
+    msg: >-
+      Existing SeaweedFS binary at {{ seaweedfs_bin_dir }}/weed is valid and verified:
+      {{ _seaweedfs_current_version.stdout_lines[0] | default('N/A') }}.
+      Desired version {{ seaweedfs_version }} (build: {{ seaweedfs_build_type }}, volume limit: {{ seaweedfs_expected_volume_limit }}) already satisfied.
+  when: not (_seaweedfs_install_needed | bool)
+
+- name: Download SeaweedFS release archive
+  tags:
+    - seaweedfs
+    - install
+  ansible.builtin.get_url:
+    url: "{{ seaweedfs_url }}"
+    dest: "{{ seaweedfs_download_dir }}/{{ seaweedfs_archive_name }}"
+    checksum: "sha256:{{ seaweedfs_checksum }}"
+    owner: root
+    group: root
+    mode: "0644"
+  register: _seaweedfs_download
+  when: _seaweedfs_install_needed | bool
+
+- name: Create temporary staging directory for binary extraction
+  tags:
+    - seaweedfs
+    - install
+  ansible.builtin.file:
+    path: "{{ seaweedfs_download_dir }}/seaweedfs-extract-{{ seaweedfs_version }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0700"
+  when: _seaweedfs_install_needed | bool
+
+- name: Unpack SeaweedFS binary into staging directory
+  tags:
+    - seaweedfs
+    - install
+  ansible.builtin.unarchive:
+    src: "{{ seaweedfs_download_dir }}/{{ seaweedfs_archive_name }}"
+    dest: "{{ seaweedfs_download_dir }}/seaweedfs-extract-{{ seaweedfs_version }}"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+  when: _seaweedfs_install_needed | bool
+
+- name: Install SeaweedFS binary to destination path
+  tags:
+    - seaweedfs
+    - install
+  ansible.builtin.copy:
+    src: "{{ seaweedfs_download_dir }}/seaweedfs-extract-{{ seaweedfs_version }}/weed"
+    dest: "{{ seaweedfs_bin_dir }}/weed"
+    remote_src: true
+    owner: root
+    group: root
+    mode: "0755"
+  when: _seaweedfs_install_needed | bool
+  notify: Restart seaweedfs
+
+- name: Verify newly installed SeaweedFS binary version
+  tags:
+    - seaweedfs
+    - install
+    - verify
+  ansible.builtin.command:
+    cmd: "{{ seaweedfs_bin_dir }}/weed version"
+  register: _seaweedfs_post_install_version
+  changed_when: false
+  when: _seaweedfs_install_needed | bool
+
+- name: Assert installed SeaweedFS binary is valid and matches target version
+  tags:
+    - seaweedfs
+    - install
+    - verify
+  ansible.builtin.assert:
+    that:
+      - _seaweedfs_post_install_version.rc == 0
+      - _seaweedfs_post_install_version.stdout_lines | length > 0
+      - _seaweedfs_post_install_version.stdout_lines[0].startswith('version ')
+      - _seaweedfs_post_install_version.stdout_lines[0].split() | length >= 6
+      - _seaweedfs_post_install_version.stdout_lines[0].split()[1] == seaweedfs_expected_volume_limit
+      - _seaweedfs_post_install_version.stdout_lines[0].split()[2] == seaweedfs_version
+      - _seaweedfs_post_install_version.stdout_lines[0].split()[4] == seaweedfs_os
+      - _seaweedfs_post_install_version.stdout_lines[0].split()[5] == seaweedfs_arch
+    fail_msg: >-
+      SeaweedFS binary validation or version check failed.
+      Output: '{{ _seaweedfs_post_install_version.stdout | default('') | trim }}'.
+      Expected: version {{ seaweedfs_expected_volume_limit }} {{ seaweedfs_version }} * {{ seaweedfs_os }} {{ seaweedfs_arch }}.
+    success_msg: "SeaweedFS binary successfully verified: {{ _seaweedfs_post_install_version.stdout_lines[0] }}."
+  when: _seaweedfs_install_needed | bool
+
+- name: Clean up temporary extraction directory
+  tags:
+    - seaweedfs
+    - install
+  ansible.builtin.file:
+    path: "{{ seaweedfs_download_dir }}/seaweedfs-extract-{{ seaweedfs_version }}"
+    state: absent
+  when:
+    - seaweedfs_cleanup_archive | default(true)
+    - _seaweedfs_install_needed | bool
+
+- name: Clean up downloaded release archive
+  tags:
+    - seaweedfs
+    - install
+  ansible.builtin.file:
+    path: "{{ seaweedfs_download_dir }}/{{ seaweedfs_archive_name }}"
+    state: absent
+  when:
+    - seaweedfs_cleanup_archive | default(true)
+    - _seaweedfs_install_needed | bool

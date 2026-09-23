@@ -1,0 +1,13 @@
+---
+# Non-secret desired state for SeaweedFS cluster hosts.
+# Secret credentials (S3 keys) must be supplied via Ansible Vault,
+# extra-vars, or local secret payloads, never committed in plaintext.
+
+seaweedfs_data_device: "/dev/sdb"
+seaweedfs_data_mount_point: "/srv/seaweedfs"
+
+# TLS and HTTPS S3 configuration
+seaweedfs_tls_enabled: true
+seaweedfs_s3_enable_http: false
+seaweedfs_s3_port_https: 8334
+seaweedfs_endpoint_hostname: "seaweedfs.example.invalid"

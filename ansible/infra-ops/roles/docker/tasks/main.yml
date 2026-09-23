@@ -1,0 +1,110 @@
+---
+- name: Assert selected Docker package source supports the Ubuntu release
+  tags: [docker, preflight]
+  ansible.builtin.assert:
+    that:
+      - docker_source in ['docker-ce', 'ubuntu']
+      - >-
+        (docker_source == 'docker-ce' and
+        ansible_distribution_release in docker_supported_distribution_releases) or
+        (docker_source == 'ubuntu' and
+        ansible_distribution_release in docker_ubuntu_supported_distribution_releases)
+    fail_msg: >-
+      Docker source {{ docker_source }} is not configured for
+      Ubuntu {{ ansible_distribution_release }}. Use Docker CE for
+      {{ docker_supported_distribution_releases | join(', ') }} or
+      Ubuntu packages for {{ docker_ubuntu_supported_distribution_releases | join(', ') }}.
+
+- name: Install Docker CE prerequisites
+  tags: [docker]
+  ansible.builtin.apt:
+    name: "{{ docker_prerequisite_packages }}"
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+  when: docker_source == 'docker-ce'
+
+- name: Ensure Docker CE APT keyring directory exists
+  tags: [docker]
+  ansible.builtin.file:
+    path: "{{ docker_keyring_directory }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: docker_source == 'docker-ce'
+
+- name: Install Docker CE APT signing key
+  tags: [docker]
+  ansible.builtin.get_url:
+    url: "{{ docker_apt_key_url }}"
+    dest: "{{ docker_keyring_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  when: docker_source == 'docker-ce'
+
+- name: Configure Docker CE APT repository
+  tags: [docker]
+  ansible.builtin.apt_repository:
+    repo: "{{ docker_apt_repository }}"
+    filename: docker
+    state: present
+    update_cache: true
+  when: docker_source == 'docker-ce'
+
+- name: Install Docker CE and Compose plugin
+  tags: [docker]
+  ansible.builtin.apt:
+    name: "{{ docker_ce_packages }}"
+    state: present
+    update_cache: true
+  when: docker_source == 'docker-ce'
+  notify: Restart docker
+
+- name: Install Ubuntu Docker Engine and Compose plugin
+  tags: [docker]
+  ansible.builtin.apt:
+    name: "{{ docker_ubuntu_packages }}"
+    state: present
+    update_cache: true
+  when: docker_source == 'ubuntu'
+  notify: Restart docker
+
+- name: Configure Docker log rotation
+  tags: [docker]
+  ansible.builtin.copy:
+    content: "{{ docker_daemon_config | to_nice_json }}\n"
+    dest: "{{ docker_daemon_config_path }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart docker
+
+- name: Ensure Docker service is enabled and running
+  tags: [docker]
+  ansible.builtin.service:
+    name: docker
+    state: started
+    enabled: true
+
+- name: Verify Docker Engine is active
+  tags: [docker, verify]
+  ansible.builtin.command:
+    cmd: systemctl is-active docker
+  changed_when: false
+  register: docker_service
+
+- name: Assert Docker Engine is active
+  tags: [docker, verify]
+  ansible.builtin.assert:
+    that:
+      - docker_service.stdout == 'active'
+    fail_msg: Docker Engine is not active on {{ inventory_hostname }}.
+
+- name: Verify Docker Compose plugin is available
+  tags: [docker, verify]
+  ansible.builtin.command:
+    cmd: docker compose version
+  changed_when: false
+  when: docker_compose_plugin_required | bool

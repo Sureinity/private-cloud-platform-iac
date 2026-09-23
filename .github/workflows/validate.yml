@@ -1,0 +1,85 @@
+---
+# ==============================================================================
+# .github/workflows/validate.yml
+#
+# Master static CI workflow for Private Cloud Platform IaC & Automation.
+# Runs 100% static validation without requiring live Proxmox credentials.
+# ==============================================================================
+
+name: Validate Repository
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+    branches: ["main"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Linting, Security, and IaC Verification
+    runs-on: ubuntu-latest
+    steps:
+      - name: Harden Runner Security
+        uses: step-security/harden-runner@cb605e52c26070c3284c4562f0f4a1ba8bed1692 # v2.10.4
+        with:
+          egress-policy: audit
+
+      - name: Checkout Code
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Set up Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: Install Python Dependencies
+        run: |
+          python3 -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
+        with:
+          terraform_version: "1.10.5"
+
+      - name: Set up TFLint
+        uses: terraform-linters/setup-tflint@800ef091eb9ebc095e78ec54191396a94ed82d5a # v4.1.1
+        with:
+          tflint_version: "v0.55.0"
+
+      - name: Validate Repository Hygiene
+        run: ./scripts/ci/validate-hygiene.sh
+
+      - name: Validate Terraform
+        run: ./scripts/ci/validate-terraform.sh
+
+      - name: Validate Ansible
+        run: ./scripts/ci/validate-ansible.sh
+
+      - name: Validate Shell Scripts
+        run: ./scripts/ci/validate-shell.sh
+
+      - name: Validate Markdown and Links
+        run: ./scripts/ci/validate-markdown.sh
+
+      - name: Run Gitleaks Secret Detection
+        uses: gitleaks/gitleaks-action@e8913919ad74e1d7d8eeb965074f85e505292eb5 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Validate Security Scans (Checkov & Exception Registry)
+        run: ./scripts/ci/validate-security.sh
+
+      - name: Validate Supply Chain Evidence and SBOM
+        run: ./scripts/ci/validate-evidence.sh
+
+      - name: Validate Security Exception Registry
+        run: ./scripts/ci/validate-exceptions.sh

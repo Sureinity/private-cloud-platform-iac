@@ -1,0 +1,8 @@
+---
+zabbix_server_address: "192.0.2.30"
+zabbix_agent_hostname: "{{ inventory_hostname }}"
+zabbix_agent2_enable_active_check: true
+zabbix_agent2_enable_passive_check: false
+zabbix_agent2_supported_distributions:
+  - Ubuntu
+  - Debian

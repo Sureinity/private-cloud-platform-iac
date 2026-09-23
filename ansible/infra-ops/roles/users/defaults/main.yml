@@ -1,0 +1,46 @@
+#SPDX-License-Identifier: MIT-0
+---
+# Account shape. Numeric identity comes from uid_registry, not from here.
+# Every name below must have a matching uid_registry key.
+#
+# Keys:
+#   name             account name, must match a uid_registry key
+#   state            present or absent
+#   shell            login shell
+#   home             home directory, defaults to /home/<name>
+#   groups           supplementary groups, appended
+#   sudo             true grants sudo through users_sudo_group
+#   sudo_nopasswd    true writes a NOPASSWD sudoers entry
+#   authorized_keys  list of public key strings
+managed_users:
+  - name: ansible
+    state: present
+    groups: []
+    shell: /bin/bash
+    home: /home/ansible
+    sudo: false
+    sudo_nopasswd: false
+    authorized_keys: []
+
+# Administrative group. Debian family, including Proxmox VE, uses sudo.
+# RedHat family, including AlmaLinux, uses wheel.
+users_sudo_group: "{{ 'wheel' if ansible_os_family == 'RedHat' else 'sudo' }}"
+
+# Feature toggles
+users_manage_authorized_keys: true
+users_manage_sudo: true
+
+# Whether authorized_keys is exclusive. False preserves keys placed by other
+# tooling, such as cloud-init. Set true only after auditing existing keys.
+users_authorized_keys_exclusive: false
+
+# Allocation ranges. Asserted before any mutation.
+# Source of truth: docs/reference/uid-gid-allocation-policy.md
+users_uid_range_human: [2000, 2999]
+users_uid_range_service: [3000, 3999]
+users_gid_range_shared: [4000, 4999]
+
+# Registry defaults so the role fails on its own assert with a clear message
+# rather than on an undefined variable.
+uid_registry: {}
+gid_registry: {}

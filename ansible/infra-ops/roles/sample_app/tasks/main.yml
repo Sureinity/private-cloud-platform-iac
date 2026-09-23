@@ -1,0 +1,326 @@
+---
+- name: Assert supported staging operating system
+  tags: [sample_app, preflight]
+  ansible.builtin.assert:
+    that:
+      - ansible_distribution in sample_app_supported_distributions
+      - ansible_os_family == 'Debian'
+    fail_msg: >-
+      The sample_app role supports Ubuntu only. Found
+      {{ ansible_distribution }} on {{ inventory_hostname }}.
+
+- name: Assert application role ownership boundaries
+  tags: [sample_app, preflight]
+  ansible.builtin.assert:
+    that:
+      - not sample_app_ansible_manages_application_deployment | bool
+      - not sample_app_ansible_manages_tailscale | bool
+      - not sample_app_ansible_manages_firewall | bool
+      - not sample_app_ansible_manages_dns | bool
+      - not sample_app_ansible_manages_ntp | bool
+      - not sample_app_ansible_manages_reboot_policy | bool
+      - not sample_app_monitoring_enabled | bool
+    fail_msg: >-
+      The sample_app role configures only the guest baseline. Application
+      deployment, Tailnet enrollment, firewall, DNS, NTP, reboot policy, and
+      monitoring require separately approved automation.
+
+- name: Assert staging account definitions
+  tags: [sample_app, preflight]
+  ansible.builtin.assert:
+    that:
+      - sample_app_accounts is mapping
+      - sample_app_accounts.operator | length > 0
+      - sample_app_accounts.developer | length > 0
+      - sample_app_accounts.deploy | length > 0
+      - sample_app_accounts.operator != sample_app_accounts.developer
+      - sample_app_accounts.operator != sample_app_accounts.deploy
+      - sample_app_accounts.developer != sample_app_accounts.deploy
+      - ssh_allowed_users | length >= 3
+    fail_msg: >-
+      Define unique operator, developer, and deploy accounts before applying
+      the application baseline.
+
+
+
+- name: Assert application paths are absolute and distinct
+  tags: [sample_app, preflight]
+  ansible.builtin.assert:
+    that:
+      - sample_app_application_root is match('^/')
+      - sample_app_env_file is match('^/')
+      - sample_app_release_state_path is match('^/')
+      - sample_app_compose_file is match('^/')
+      - sample_app_deploy_wrapper_path is match('^/')
+      - sample_app_deploy_sudoers_path is match('^/')
+      - sample_app_deployment_lock_path is match('^/')
+      - sample_app_ghcr_credentials_path is match('^/')
+      - sample_app_env_file != sample_app_release_state_path
+    fail_msg: >-
+      Application, Compose, secret, release-state, wrapper, sudoers, and lock
+      paths must be absolute. The environment and release-state paths must be
+      distinct.
+
+- name: Assert constrained deployment wrapper inputs
+  tags: [sample_app, preflight, deployment]
+  ansible.builtin.assert:
+    that:
+      - sample_app_image_repository is match('^ghcr\.io/[a-z0-9][a-z0-9._/-]*$')
+      - sample_app_deploy_image_tag_pattern is match('^\^?[a-z0-9][a-z0-9._\[\]{}^,-]*\$?$')
+      - sample_app_ghcr_username | length > 0
+    fail_msg: >-
+      Define a fixed GHCR image repository, staging-tag prefix, and host-side
+      package-read username for the constrained deployment wrapper.
+
+- name: Assert managed payload paths are defined
+  tags: [sample_app, preflight]
+  ansible.builtin.assert:
+    that:
+      - sample_app_release_state_source_path | length > 0
+      - sample_app_env_source_path | length > 0
+      - sample_app_ghcr_credentials_source_path | length > 0
+    fail_msg: >-
+      Define committed non-secret and ignored secret payload paths before
+      applying the application baseline.
+
+- name: Check committed release-state payload
+  tags: [sample_app, application_layout]
+  ansible.builtin.stat:
+    path: "{{ sample_app_release_state_source_path }}"
+  delegate_to: localhost
+  become: false
+  register: sample_app_release_state_source
+
+- name: Assert committed release-state payload is available
+  tags: [sample_app, application_layout]
+  ansible.builtin.assert:
+    that:
+      - sample_app_release_state_source.stat.exists
+      - sample_app_release_state_source.stat.isreg
+    fail_msg: >-
+      The committed release-state payload is missing. Restore
+      {{ sample_app_release_state_source_path }} before applying.
+
+- name: Assert ignored staging environment file is available
+  tags: [sample_app, secrets]
+  ansible.builtin.assert:
+    that:
+      - sample_app_env_source_path | length > 0
+    fail_msg: >-
+      Provide the documented ignored secret payload before applying the staging
+      baseline.
+  no_log: true
+
+- name: Check ignored staging environment file
+  tags: [sample_app, secrets]
+  ansible.builtin.stat:
+    path: "{{ sample_app_env_source_path }}"
+  delegate_to: localhost
+  become: false
+  register: sample_app_environment_source
+  no_log: true
+
+- name: Assert ignored staging environment file is protected
+  tags: [sample_app, secrets]
+  ansible.builtin.assert:
+    that:
+      - sample_app_environment_source.stat.exists
+      - sample_app_environment_source.stat.isreg
+      - sample_app_environment_source.stat.mode == '0600'
+    fail_msg: >-
+      The ignored .env.staging source must exist, be a regular file, and have
+      mode 0600. Keep it out of the committed files/ tree.
+  no_log: true
+
+- name: Check ignored GHCR package-read token
+  tags: [sample_app, secrets, deployment]
+  ansible.builtin.stat:
+    path: "{{ sample_app_ghcr_credentials_source_path }}"
+  delegate_to: localhost
+  become: false
+  register: sample_app_ghcr_credentials_source
+  no_log: true
+
+- name: Assert ignored GHCR package-read token is protected
+  tags: [sample_app, secrets, deployment]
+  ansible.builtin.assert:
+    that:
+      - sample_app_ghcr_credentials_source.stat.exists
+      - sample_app_ghcr_credentials_source.stat.isreg
+      - sample_app_ghcr_credentials_source.stat.mode == '0600'
+    fail_msg: >-
+      The ignored GHCR package-read token must exist as a regular mode-0600
+      file at {{ sample_app_ghcr_credentials_source_path }}.
+  no_log: true
+
+
+
+- name: Ensure application root exists
+  tags: [sample_app, application_layout]
+  ansible.builtin.file:
+    path: "{{ sample_app_application_root }}"
+    state: directory
+    owner: "{{ sample_app_application_owner }}"
+    group: "{{ sample_app_application_group }}"
+    mode: "{{ sample_app_application_root_mode }}"
+
+- name: Install protected staging environment file
+  tags: [sample_app, secrets]
+  ansible.builtin.copy:
+    src: "{{ sample_app_env_source_path }}"
+    dest: "{{ sample_app_env_file }}"
+    owner: "{{ sample_app_environment_owner }}"
+    group: "{{ sample_app_environment_group }}"
+    mode: "{{ sample_app_environment_mode }}"
+    backup: true
+  no_log: true
+
+- name: Ensure non-secret release-state file exists
+  tags: [sample_app, application_layout]
+  ansible.builtin.copy:
+    src: "{{ sample_app_release_state_source_path }}"
+    dest: "{{ sample_app_release_state_path }}"
+    owner: "{{ sample_app_release_state_owner }}"
+    group: "{{ sample_app_release_state_group }}"
+    mode: "{{ sample_app_release_state_mode }}"
+
+- name: Ensure host-side GHCR credential directory exists
+  tags: [sample_app, secrets, deployment]
+  ansible.builtin.file:
+    path: "{{ sample_app_ghcr_credentials_path | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0750"
+
+- name: Install protected GHCR package-read token
+  tags: [sample_app, secrets, deployment]
+  ansible.builtin.copy:
+    src: "{{ sample_app_ghcr_credentials_source_path }}"
+    dest: "{{ sample_app_ghcr_credentials_path }}"
+    owner: root
+    group: root
+    mode: "0600"
+    backup: true
+  no_log: true
+
+- name: Install constrained staging deployment wrapper
+  tags: [sample_app, deployment]
+  ansible.builtin.template:
+    src: sample-staging-deploy.sh.j2
+    dest: "{{ sample_app_deploy_wrapper_path }}"
+    owner: root
+    group: root
+    mode: "{{ sample_app_deployment_wrapper_mode }}"
+
+- name: Check host-side GHCR credential file metadata
+  tags: [sample_app, deployment, verify]
+  ansible.builtin.stat:
+    path: "{{ sample_app_ghcr_credentials_path }}"
+  register: sample_app_ghcr_credentials
+  no_log: true
+
+- name: Assert host-side GHCR credential file is protected
+  tags: [sample_app, deployment, verify]
+  ansible.builtin.assert:
+    that:
+      - sample_app_ghcr_credentials.stat.exists
+      - sample_app_ghcr_credentials.stat.isreg
+      - sample_app_ghcr_credentials.stat.pw_name == 'root'
+      - sample_app_ghcr_credentials.stat.gr_name == 'root'
+      - sample_app_ghcr_credentials.stat.mode == '0600'
+    fail_msg: >-
+      Create {{ sample_app_ghcr_credentials_path }} as a root-owned,
+      mode-0600 host-local GHCR package-read credential before enabling CI
+      deployment. Do not store its value in Git, Ansible variables, or GitHub.
+  no_log: true
+
+- name: Grant deploy account access to constrained deployment wrapper only
+  tags: [sample_app, deployment]
+  ansible.builtin.template:
+    src: sample-staging-deploy.sudoers.j2
+    dest: "{{ sample_app_deploy_sudoers_path }}"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: visudo -cf %s
+
+- name: Verify constrained deployment wrapper metadata
+  tags: [sample_app, deployment, verify]
+  ansible.builtin.stat:
+    path: "{{ sample_app_deploy_wrapper_path }}"
+  register: sample_app_deployment_wrapper
+
+- name: Assert constrained deployment wrapper is root-owned and executable
+  tags: [sample_app, deployment, verify]
+  ansible.builtin.assert:
+    that:
+      - sample_app_deployment_wrapper.stat.exists
+      - sample_app_deployment_wrapper.stat.isreg
+      - sample_app_deployment_wrapper.stat.pw_name == 'root'
+      - sample_app_deployment_wrapper.stat.gr_name == 'root'
+      - sample_app_deployment_wrapper.stat.mode == sample_app_deployment_wrapper_mode
+    fail_msg: The constrained staging deployment wrapper metadata is incorrect.
+
+- name: Check Tailscale service state
+  tags: [sample_app, tailscale, verify]
+  ansible.builtin.command:
+    cmd: "systemctl is-active {{ sample_app_tailscale_service_name }}"
+  changed_when: false
+  register: sample_app_tailscale_service
+
+  when: sample_app_verify_tailscale | bool
+- name: Assert Tailscale service is active
+  tags: [sample_app, tailscale, verify]
+  ansible.builtin.assert:
+    that:
+      - sample_app_tailscale_service.stdout == 'active'
+    fail_msg: Tailscale service is not active on {{ inventory_hostname }}.
+
+  when: sample_app_verify_tailscale | bool
+- name: Verify connected Tailscale node identity without changing it
+  tags: [sample_app, tailscale, verify]
+  ansible.builtin.command:
+    cmd: "{{ sample_app_tailscale_verify_command }}"
+  changed_when: false
+  register: sample_app_tailscale_status
+  no_log: true
+
+  when: sample_app_verify_tailscale | bool
+- name: Assert expected Tailscale hostname
+  tags: [sample_app, tailscale, verify]
+  ansible.builtin.assert:
+    that:
+      - (sample_app_tailscale_status.stdout | from_json).Self.HostName == sample_app_tailscale_hostname
+    fail_msg: >-
+      The connected Tailscale hostname does not match
+      {{ sample_app_tailscale_hostname }}. This role does not run
+      tailscale up or repair Tailnet enrollment.
+  no_log: true
+
+  when: sample_app_verify_tailscale | bool
+- name: Verify SSH configuration syntax
+  tags: [sample_app, ssh, verify]
+  ansible.builtin.command:
+    cmd: /usr/sbin/sshd -t
+  changed_when: false
+
+
+
+- name: Verify protected environment file metadata
+  tags: [sample_app, secrets, verify]
+  ansible.builtin.stat:
+    path: "{{ sample_app_env_file }}"
+  register: sample_app_environment_destination
+  no_log: true
+
+- name: Assert protected environment file metadata
+  tags: [sample_app, secrets, verify]
+  ansible.builtin.assert:
+    that:
+      - sample_app_environment_destination.stat.exists
+      - sample_app_environment_destination.stat.pw_name == sample_app_environment_owner
+      - sample_app_environment_destination.stat.gr_name == sample_app_environment_group
+      - sample_app_environment_destination.stat.mode == sample_app_environment_mode
+    fail_msg: The staging environment file ownership or mode is incorrect.
+  no_log: true

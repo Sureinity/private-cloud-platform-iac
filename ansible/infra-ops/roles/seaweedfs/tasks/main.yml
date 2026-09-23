@@ -1,0 +1,56 @@
+# SPDX-License-Identifier: MIT-0
+---
+# tasks file for seaweedfs
+
+- name: Include preflight checks
+  tags:
+    - seaweedfs
+    - preflight
+  ansible.builtin.include_tasks: preflight.yml
+
+- name: Include service identity configuration
+  tags:
+    - seaweedfs
+    - user
+    - security
+  ansible.builtin.include_tasks: user.yml
+
+- name: Include storage and filesystem configuration
+  tags:
+    - seaweedfs
+    - storage
+  ansible.builtin.include_tasks: storage.yml
+
+- name: Include binary installation
+  tags:
+    - seaweedfs
+    - install
+  ansible.builtin.include_tasks: install.yml
+
+- name: Include TLS certificate and HTTPS configuration
+  tags:
+    - seaweedfs
+    - tls
+    - security
+  ansible.builtin.include_tasks: tls.yml
+  when: seaweedfs_tls_enabled | bool
+
+- name: Include configuration and secrets management
+  tags:
+    - seaweedfs
+    - config
+    - secrets
+  ansible.builtin.include_tasks: config.yml
+
+- name: Flush handlers to restart SeaweedFS before verification
+  tags:
+    - seaweedfs
+    - config
+    - verify
+  ansible.builtin.meta: flush_handlers
+
+- name: Include post-deployment verification
+  tags:
+    - seaweedfs
+    - verify
+  ansible.builtin.include_tasks: verify.yml

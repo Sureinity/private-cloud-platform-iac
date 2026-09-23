@@ -1,0 +1,17 @@
+#SPDX-License-Identifier: MIT-0
+---
+# handlers file for seaweedfs
+
+- name: Reload systemd
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+
+- name: Restart seaweedfs
+  ansible.builtin.systemd_service:
+    name: seaweedfs
+    state: restarted
+
+- name: Reload seaweedfs
+  ansible.builtin.systemd_service:
+    name: seaweedfs
+    state: reloaded

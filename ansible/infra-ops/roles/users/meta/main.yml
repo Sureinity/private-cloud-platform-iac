@@ -1,0 +1,15 @@
+---
+galaxy_info:
+  role_name: users
+  author: Home PVE operators
+  description: Manage system users, groups, and SSH authorized keys against uid_registry.
+  license: MIT-0
+  min_ansible_version: '2.16'
+  platforms:
+    - name: Ubuntu
+      versions:
+        - all
+    - name: Debian
+      versions:
+        - all
+dependencies: []

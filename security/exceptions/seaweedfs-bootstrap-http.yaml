@@ -1,0 +1,15 @@
+schema_version: "1.0.0"
+id: "CKV2_ANSIBLE_1"
+tool: "checkov"
+severity: "MEDIUM"
+owner: "@Sureinity"
+approved_by: "@Sureinity"
+created_at: "2026-09-21"
+expires_at: "2026-12-31"
+path: "ansible/infra-ops/roles/seaweedfs/tasks/verify.yml"
+resource: "tasks.ansible.builtin.uri"
+rationale: >-
+  SeaweedFS cluster master status and S3 gateway endpoints currently operate over HTTP
+  on the private isolated subnet (192.0.2.51) during Phase 1-2 bootstrap. TLS certificate
+  termination for S3 and master APIs is scheduled for delivery in Phase 3.
+remediation_ticket: "Phase 3 SeaweedFS State Qualification and TLS Hardening"

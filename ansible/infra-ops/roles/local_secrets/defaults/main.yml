@@ -1,0 +1,4 @@
+---
+# Default to loading access.yml if no list is provided
+secret_vars_files:
+  - access.yml

@@ -1,0 +1,65 @@
+# Local artifacts and generated inspection output
+artifacts/
+
+# Terraform runtime/cache
+**/.terraform/
+
+# Terraform state
+*.tfstate
+*.tfstate.*
+crash.log
+crash.*.log
+
+# Terraform plans
+*.tfplan
+*.tfplan.*
+tfplan
+plan.out
+*.plan
+
+# Terraform local variable files and overrides
+*.tfvars
+terraform.tfvars
+*.auto.tfvars
+*.auto.tfvars.json
+*.tfvars.*
+!*.tfvars.example
+*.tfvars.bk
+
+# Downloaded or decompressed install media and VM disks
+*.iso
+*.img
+*.qcow2
+*.raw
+*.vmdk
+# Ansible local runtime
+*.retry
+.vault_pass
+*.vault-pass
+**/.ansible/
+
+# Local Ansible runtime secrets. Non-secret host payloads belong under each
+# project's committed files/ directory; secret payloads belong under its
+# ignored secrets/ directory and must never be committed.
+ansible/infra-ops/secrets/**
+!ansible/infra-ops/secrets/README.md
+
+# Local device and appliance configuration exports may contain secrets
+configs/
+
+# Local Ansible secrets and operator payloads
+**/secrets/*
+!**/secrets/README.md
+
+# General catch-all for secrets outside the secrets directory
+.env
+.env.*
+*.pem
+*.key
+id_rsa
+id_ed25519
+
+# Python cache and bytecode
+__pycache__/
+*.py[cod]
+*$py.class

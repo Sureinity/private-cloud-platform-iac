@@ -1,0 +1,11 @@
+---
+galaxy_info:
+  author: On-Premises PVE operators
+  description: Baseline configuration for the isolated SampleApp application VM.
+  license: MIT-0
+  min_ansible_version: '2.16'
+  platforms:
+    - name: Ubuntu
+      versions:
+        - noble
+dependencies: []

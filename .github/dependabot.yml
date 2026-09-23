@@ -1,0 +1,61 @@
+version: 2
+updates:
+  # Automated weekly dependency updates for GitHub Actions workflows
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:00"
+      timezone: "UTC"
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(ci)"
+      include: "scope"
+    open-pull-requests-limit: 5
+
+  # Automated weekly dependency updates for Terraform live environment root
+  - package-ecosystem: "terraform"
+    directory: "/terraform/live/onprem-pve"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "03:30"
+      timezone: "UTC"
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(terraform)"
+      include: "scope"
+    open-pull-requests-limit: 5
+
+  # Automated weekly dependency updates for Terraform bootstrap SeaweedFS root
+  - package-ecosystem: "terraform"
+    directory: "/terraform/bootstrap/seaweedfs"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:00"
+      timezone: "UTC"
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(terraform)"
+      include: "scope"
+    open-pull-requests-limit: 5
+
+  # Automated weekly dependency updates for Python CI tooling
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "04:30"
+      timezone: "UTC"
+    cooldown:
+      default-days: 7
+    commit-message:
+      prefix: "chore(deps)"
+      include: "scope"
+    open-pull-requests-limit: 5

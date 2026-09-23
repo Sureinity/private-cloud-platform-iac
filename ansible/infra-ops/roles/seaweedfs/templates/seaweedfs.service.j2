@@ -1,0 +1,66 @@
+# Managed by Ansible — do not edit by hand.
+[Unit]
+Description=SeaweedFS Server (Master, Volume, Filer, S3)
+Documentation=https://github.com/seaweedfs/seaweedfs/wiki
+After=network.target local-fs.target
+RequiresMountsFor={{ seaweedfs_data_mount_point }}
+AssertPathIsMountPoint={{ seaweedfs_data_mount_point }}
+
+[Service]
+Type=simple
+User={{ seaweedfs_user }}
+Group={{ seaweedfs_group }}
+WorkingDirectory={{ seaweedfs_data_mount_point }}
+EnvironmentFile=-{{ seaweedfs_env_file }}
+ExecStart={{ seaweedfs_bin_dir }}/weed server \
+  -dir={{ seaweedfs_data_mount_point }}/volume \
+  -master.dir={{ seaweedfs_data_mount_point }}/master \
+  -volume.max={{ seaweedfs_volume_max }} \
+  -ip={{ seaweedfs_ip | default(ansible_default_ipv4.address) }} \
+  -ip.bind={{ seaweedfs_bind_ip }} \
+  -master.port={{ seaweedfs_master_port }} \
+  -volume.port={{ seaweedfs_volume_port }} \
+  -filer=true \
+  -filer.port={{ seaweedfs_filer_port }} \
+  -s3=true \
+{% if not seaweedfs_s3_enable_http | bool %}
+  -s3.port=0 \
+{% else %}
+  -s3.port={{ seaweedfs_s3_port }} \
+{% endif %}
+{% if seaweedfs_tls_enabled | bool %}
+  -s3.port.https={{ seaweedfs_s3_port_https }} \
+  -s3.cert.file={{ seaweedfs_s3_cert_file }} \
+  -s3.key.file={{ seaweedfs_s3_key_file }} \
+{% if seaweedfs_s3_cacert_file | default('') | length > 0 %}
+  -s3.cacert.file={{ seaweedfs_s3_cacert_file }} \
+{% endif %}
+  -s3.externalUrl={{ seaweedfs_s3_external_url }} \
+{% endif %}
+  -s3.config={{ seaweedfs_s3_config_file }}
+ExecReload=/bin/kill -HUP $MAINPID
+
+Restart=always
+RestartSec=5
+LimitNOFILE=65536
+TasksMax=infinity
+
+# Systemd Hardening & Sandboxing (Stage 6)
+ProtectSystem=strict
+ProtectHome=true
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictRealtime=true
+RestrictSUIDSGID=true
+ReadWritePaths={{ seaweedfs_data_mount_point }} {{ seaweedfs_user_home }}
+{% if seaweedfs_tls_enabled | bool %}
+ReadOnlyPaths={{ seaweedfs_tls_dir }}
+{% endif %}
+{% if seaweedfs_tls_enabled | bool and (seaweedfs_s3_port_https | int < 1024 or (seaweedfs_s3_enable_http | bool and seaweedfs_s3_port | int < 1024)) %}
+AmbientCapabilities=CAP_NET_BIND_SERVICE
+{% endif %}
+
+[Install]
+WantedBy=multi-user.target

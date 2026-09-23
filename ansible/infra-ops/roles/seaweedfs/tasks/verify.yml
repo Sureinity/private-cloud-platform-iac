@@ -1,0 +1,163 @@
+# SPDX-License-Identifier: MIT-0
+---
+# tasks file for seaweedfs/verify.yml
+# Stage 7: Post-Deployment Verification (Sanity Check)
+#
+# Pipeline:
+# [ Process Running? ] ──► [ Ports Listening? ] ──► [ API Responsive? ] ──► [ Verified Ready ]
+#
+# Principles:
+# 1. Process Running: Query systemd unit status, assert ActiveState=active and SubState=running.
+# 2. Ports Listening: Wait for Master (:9333), Volume (:8080), Filer (:8888), S3 HTTP (:8333) and HTTPS (:8334).
+# 3. API Responsive: Test control plane (Master /cluster/status) and data plane (S3 HTTP & HTTPS XML probes).
+# 4. Verified Ready: Confirm cluster readiness before migrating state or running day-2 workloads.
+
+- name: Query SeaweedFS systemd service status
+  tags:
+    - seaweedfs
+    - verify
+  ansible.builtin.systemd_service:
+    name: seaweedfs
+  register: _seaweedfs_service_status
+
+- name: Assert SeaweedFS service is active and running
+  tags:
+    - seaweedfs
+    - verify
+  ansible.builtin.assert:
+    that:
+      - _seaweedfs_service_status.status.ActiveState == 'active'
+      - _seaweedfs_service_status.status.SubState == 'running'
+    fail_msg: >-
+      SeaweedFS service is not running.
+      ActiveState: '{{ _seaweedfs_service_status.status.ActiveState | default('unknown') }}',
+      SubState: '{{ _seaweedfs_service_status.status.SubState | default('unknown') }}'.
+    success_msg: "SeaweedFS systemd service is active (running)."
+
+- name: Build list of expected SeaweedFS listening ports
+  tags:
+    - seaweedfs
+    - verify
+  ansible.builtin.set_fact:
+    _seaweedfs_expected_ports: >-
+      {{
+        [
+          {'name': 'Master HTTP', 'port': seaweedfs_master_port},
+          {'name': 'Volume HTTP', 'port': seaweedfs_volume_port},
+          {'name': 'Filer HTTP', 'port': seaweedfs_filer_port}
+        ]
+        + ([{'name': 'S3 HTTP API', 'port': seaweedfs_s3_port}] if seaweedfs_s3_enable_http | bool else [])
+        + ([{'name': 'S3 HTTPS API', 'port': seaweedfs_s3_port_https}] if seaweedfs_tls_enabled | bool else [])
+      }}
+
+- name: Wait for SeaweedFS core ports to accept connections
+  tags:
+    - seaweedfs
+    - verify
+  ansible.builtin.wait_for:
+    host: "{{ '127.0.0.1' if seaweedfs_bind_ip == '0.0.0.0' else seaweedfs_bind_ip }}"
+    port: "{{ item.port }}"
+    state: started
+    timeout: 30
+  loop: "{{ _seaweedfs_expected_ports }}"
+  loop_control:
+    label: "{{ item.name }} (:{{ item.port }})"
+
+- name: Probe SeaweedFS Master cluster status API
+  tags:
+    - seaweedfs
+    - verify
+  ansible.builtin.uri:
+    url: "http://{{ '127.0.0.1' if seaweedfs_bind_ip == '0.0.0.0' else seaweedfs_bind_ip }}:{{ seaweedfs_master_port }}/cluster/status"
+    method: GET
+    return_content: true
+    status_code: 200
+  register: _seaweedfs_master_probe
+
+- name: Assert Master control plane is leader and responsive
+  tags:
+    - seaweedfs
+    - verify
+  ansible.builtin.assert:
+    that:
+      - _seaweedfs_master_probe.status == 200
+      - _seaweedfs_master_probe.json.IsLeader is defined
+    fail_msg: "Master cluster API failed or node is not leader. Response: {{ _seaweedfs_master_probe.content | default('') }}"
+    success_msg: "Master control plane responsive (Leader: {{ _seaweedfs_master_probe.json.Leader | default('N/A') }})."
+
+- name: Probe SeaweedFS S3 HTTP endpoint
+  tags:
+    - seaweedfs
+    - verify
+  ansible.builtin.uri:
+    url: "http://{{ '127.0.0.1' if seaweedfs_bind_ip == '0.0.0.0' else seaweedfs_bind_ip }}:{{ seaweedfs_s3_port }}/"
+    method: GET
+    return_content: true
+    status_code:
+      - 200
+      - 403
+  register: _seaweedfs_s3_probe
+  when: seaweedfs_s3_enable_http | bool
+
+- name: Assert S3 HTTP endpoint returns valid S3 XML response
+  tags:
+    - seaweedfs
+    - verify
+  ansible.builtin.assert:
+    that:
+      - _seaweedfs_s3_probe.status in [200, 403]
+      - >-
+        ('<?xml' in _seaweedfs_s3_probe.content)
+        or ('<Error>' in _seaweedfs_s3_probe.content)
+        or ('<ListAllMyBucketsResult' in _seaweedfs_s3_probe.content)
+    fail_msg: >-
+      S3 HTTP endpoint did not return valid S3 XML response.
+      Status: {{ _seaweedfs_s3_probe.status }}, Body: '{{ _seaweedfs_s3_probe.content | default('') }}'.
+    success_msg: "S3 HTTP endpoint responsive and returned valid S3 XML payload (HTTP {{ _seaweedfs_s3_probe.status }})."
+  when: seaweedfs_s3_enable_http | bool
+
+- name: Probe SeaweedFS S3 HTTPS endpoint
+  tags:
+    - seaweedfs
+    - verify
+    - tls
+  # checkov:skip=CKV_ANSIBLE_1: Local loopback health check connects via 127.0.0.1 before DNS propagation
+  ansible.builtin.uri:
+    url: "https://127.0.0.1:{{ seaweedfs_s3_port_https }}/"
+    method: GET
+    return_content: true
+    validate_certs: false
+    status_code:
+      - 200
+      - 403
+  register: _seaweedfs_s3_https_probe
+  when: seaweedfs_tls_enabled | bool
+
+- name: Assert S3 HTTPS endpoint returns valid S3 XML response
+  tags:
+    - seaweedfs
+    - verify
+    - tls
+  ansible.builtin.assert:
+    that:
+      - _seaweedfs_s3_https_probe.status in [200, 403]
+      - >-
+        ('<?xml' in _seaweedfs_s3_https_probe.content)
+        or ('<Error>' in _seaweedfs_s3_https_probe.content)
+        or ('<ListAllMyBucketsResult' in _seaweedfs_s3_https_probe.content)
+    fail_msg: >-
+      S3 HTTPS endpoint did not return valid S3 XML response.
+      Status: {{ _seaweedfs_s3_https_probe.status }}, Body: '{{ _seaweedfs_s3_https_probe.content | default('') }}'.
+    success_msg: "S3 HTTPS endpoint responsive and returned valid S3 XML payload (HTTP {{ _seaweedfs_s3_https_probe.status }})."
+  when: seaweedfs_tls_enabled | bool
+
+- name: Report SeaweedFS cluster verification ready
+  tags:
+    - seaweedfs
+    - verify
+  ansible.builtin.debug:
+    msg: >-
+      SeaweedFS post-deployment verification complete:
+      Process running under systemd supervision, ports ({{ _seaweedfs_expected_ports | map(attribute='port') | join(', ') }}) listening,
+      and both Master control plane and S3 data plane APIs (HTTP: {{ seaweedfs_s3_enable_http }}, TLS: {{ seaweedfs_tls_enabled }})
+      are healthy and verified ready.

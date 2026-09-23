@@ -1,0 +1,76 @@
+name: Scheduled Security Scan
+
+on:
+  schedule:
+    # Run weekly at 04:00 UTC on Mondays for out-of-band CVE and vulnerability discovery
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  security-audit:
+    name: Out-of-Band Vulnerability & Posture Scan
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Source tool versions
+        id: versions
+        run: |
+          source scripts/ci/versions.env
+          echo "gitleaks_version=${GITLEAKS_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "trivy_version=${TRIVY_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Run full-history Gitleaks scan
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: ${{ steps.versions.outputs.gitleaks_version }}
+
+      - name: Setup Trivy
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: "v${{ steps.versions.outputs.trivy_version }}"
+          cache: true
+
+      - name: Validate security exception registry
+        run: ./scripts/ci/validate-exceptions.sh
+
+      - name: Generate CycloneDX SBOM & evidence manifest
+        run: ./scripts/ci/validate-evidence.sh
+
+      - name: Scan CycloneDX SBOM with Trivy for new CVEs
+        run: trivy sbom --severity HIGH,CRITICAL artifacts/sbom.cdx.json
+
+      - name: Run IaC security and Checkov scans
+        run: ./scripts/ci/validate-security.sh
+
+      - name: Upload scheduled security evidence
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: scheduled-security-evidence
+          path: |
+            artifacts/sbom.cdx.json
+            artifacts/evidence-manifest.json
+            artifacts/checkov-report.json
+          retention-days: 90

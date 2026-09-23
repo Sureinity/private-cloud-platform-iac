@@ -1,0 +1,15 @@
+---
+galaxy_info:
+  role_name: ssh
+  author: Home PVE operators
+  description: Harden OpenSSH daemon configuration and enforce access boundaries.
+  license: MIT-0
+  min_ansible_version: '2.16'
+  platforms:
+    - name: Ubuntu
+      versions:
+        - all
+    - name: Debian
+      versions:
+        - all
+dependencies: []

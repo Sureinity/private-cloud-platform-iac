@@ -1,0 +1,29 @@
+# ==============================================================================
+# .github/CODEOWNERS
+#
+# CODEOWNERS file defining mandatory review requirements for sensitive
+# automation, pipeline workflows, CI scripts, dependency locks, and policies.
+# ==============================================================================
+
+# Default fallback owner for the repository
+* @Sureinity
+
+# GitHub Actions workflows and automation
+/.github/ @Sureinity
+
+# CI parity scripts and version pins
+/scripts/ci/ @Sureinity
+
+# Dependency and version pinning manifests
+/.tool-versions @Sureinity
+/.tflint.hcl @Sureinity
+/requirements.txt @Sureinity
+/ansible/infra-ops/requirements.yml @Sureinity
+
+# Terraform dependency lockfiles and provider versions
+/terraform/**/versions.tf @Sureinity
+/terraform/**/.terraform.lock.hcl @Sureinity
+
+# Infrastructure supply-chain security policies and documents
+/docs/explanation/infrastructure-supply-chain-security-pipeline.md @Sureinity
+/docs/reference/supply-chain-tool-versions.md @Sureinity

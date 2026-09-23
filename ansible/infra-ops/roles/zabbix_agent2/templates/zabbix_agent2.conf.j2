@@ -1,0 +1,20 @@
+# Managed by Ansible — do not edit by hand.
+
+PidFile=/run/zabbix/zabbix_agent2.pid
+LogType=file
+LogFile=/var/log/zabbix/zabbix_agent2.log
+
+{% if zabbix_agent2_enable_passive_check %}
+Server={{ zabbix_server_address }}
+{% endif %}
+{% if zabbix_agent2_enable_active_check %}
+ServerActive={{ zabbix_server_address }}
+{% endif %}
+Hostname={{ zabbix_agent_hostname }}
+
+Include=/etc/zabbix/zabbix_agent2.d/*.conf
+ControlSocket=/run/zabbix/zabbix_agent2.sock
+
+# Security (deferred — PSK/TLS to be implemented in a later iteration)
+# This block is intentionally inactive. Do not enable transport security
+# directives here until the next security/encryption implementation ticket.

@@ -1,0 +1,111 @@
+#SPDX-License-Identifier: MIT-0
+---
+- name: Validate target operating system
+  tags:
+    - seaweedfs
+    - preflight
+  ansible.builtin.assert:
+    that:
+      - ansible_system == "Linux"
+      - ansible_os_family in seaweedfs_supported_os_families
+      - ansible_distribution in seaweedfs_supported_distributions
+    fail_msg: >-
+      Unsupported OS family or distribution: {{ ansible_distribution | default('Unknown') }}
+      ({{ ansible_os_family | default('Unknown') }} / {{ ansible_system | default('Unknown') }}).
+      Supported distributions are: {{ seaweedfs_supported_distributions | join(', ') }}.
+    success_msg: "Target OS ({{ ansible_distribution }} {{ ansible_distribution_version }}) is supported."
+
+- name: Validate system architecture matches binary build
+  tags:
+    - seaweedfs
+    - preflight
+  ansible.builtin.assert:
+    that:
+      - ansible_architecture in seaweedfs_supported_architectures
+      - (ansible_architecture == 'x86_64' and seaweedfs_arch == 'amd64') or (ansible_architecture == seaweedfs_arch)
+    fail_msg: >-
+      Host architecture '{{ ansible_architecture }}' does not match
+      SeaweedFS binary architecture '{{ seaweedfs_arch }}'.
+    success_msg: "System architecture {{ ansible_architecture }} matches binary build {{ seaweedfs_arch }}."
+
+- name: Verify configured block device exists
+  tags:
+    - seaweedfs
+    - preflight
+  ansible.builtin.stat:
+    path: "{{ seaweedfs_data_device }}"
+  register: _seaweedfs_device_stat
+  when: seaweedfs_storage_check_type == "device"
+
+- name: Assert configured block device exists and is a special device
+  tags:
+    - seaweedfs
+    - preflight
+  ansible.builtin.assert:
+    that:
+      - _seaweedfs_device_stat.stat.exists
+      - _seaweedfs_device_stat.stat.isblk or _seaweedfs_device_stat.stat.ischr
+    fail_msg: >-
+      Configured data device '{{ seaweedfs_data_device }}' was not found or is not a block device.
+    success_msg: "Configured block device '{{ seaweedfs_data_device }}' is present."
+  when: seaweedfs_storage_check_type == "device"
+
+- name: Verify configured mount point exists
+  tags:
+    - seaweedfs
+    - preflight
+  ansible.builtin.stat:
+    path: "{{ seaweedfs_data_mount_point }}"
+  register: _seaweedfs_mount_stat
+  when: seaweedfs_storage_check_type == "mount"
+
+- name: Assert configured mount point exists
+  tags:
+    - seaweedfs
+    - preflight
+  ansible.builtin.assert:
+    that:
+      - _seaweedfs_mount_stat.stat.exists
+      - _seaweedfs_mount_stat.stat.isdir
+    fail_msg: >-
+      Configured data mount point '{{ seaweedfs_data_mount_point }}' does not exist or is not a directory.
+    success_msg: "Configured data mount point '{{ seaweedfs_data_mount_point }}' is present."
+  when: seaweedfs_storage_check_type == "mount"
+
+- name: Query existing SeaweedFS systemd service status
+  tags:
+    - seaweedfs
+    - preflight
+  ansible.builtin.systemd_service:
+    name: seaweedfs
+  register: _seaweedfs_service_preflight
+  failed_when: false
+
+- name: Check listening TCP ports for collisions
+  tags:
+    - seaweedfs
+    - preflight
+  ansible.builtin.command:
+    cmd: "ss -H -t -l -n sport = :{{ item }}"
+  register: _seaweedfs_port_checks
+  changed_when: false
+  loop: "{{ seaweedfs_required_ports }}"
+  loop_control:
+    label: "port {{ item }}"
+  when: (_seaweedfs_service_preflight.status.ActiveState | default('')) != 'active'
+
+- name: Assert required ports are not occupied by conflicting processes
+  tags:
+    - seaweedfs
+    - preflight
+  ansible.builtin.assert:
+    that:
+      - item.stdout | trim | length == 0
+    fail_msg: >-
+      Port collision detected on {{ item.item }}. Port is already bound:
+      {{ item.stdout | trim }}
+    success_msg: "Port {{ item.item }} is currently free."
+  loop: "{{ _seaweedfs_port_checks.results | default([]) }}"
+  loop_control:
+    label: "port {{ item.item }}"
+  when: (_seaweedfs_service_preflight.status.ActiveState | default('')) != 'active'

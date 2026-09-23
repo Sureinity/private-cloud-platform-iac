@@ -1,0 +1,63 @@
+---
+# Example Ansible Inventory for Private Cloud Platform Operations
+# All IP addresses use RFC 5737 test documentation subnets (192.0.2.0/24).
+# Replace these addresses with your real isolated management subnet allocations.
+
+all:
+  children:
+    pve_hosts:
+      hosts:
+        pve-node-01:
+          ansible_host: 192.0.2.10
+          ansible_user: operator
+          ansible_port: 22
+
+    seaweedfs_hosts:
+      hosts:
+        seaweedfs-state:
+          ansible_host: 192.0.2.51
+          ansible_user: ubuntu
+          ansible_port: 22
+
+    zabbix_hosts:
+      children:
+        zabbix_server_hosts:
+          hosts:
+            zbx-monolith:
+              ansible_host: 192.0.2.30
+              ansible_user: debian
+              ansible_port: 22
+
+        zabbix_agent2_hosts:
+          hosts:
+            zbx-client-01:
+              ansible_host: 192.0.2.33
+              ansible_user: ubuntu
+              ansible_port: 22
+            zbx-client-02:
+              ansible_host: 192.0.2.34
+              ansible_user: ubuntu
+              ansible_port: 22
+            zbx-client-03:
+              ansible_host: 192.0.2.35
+              ansible_user: ubuntu
+              ansible_port: 22
+            zbx-client-04:
+              ansible_host: 192.0.2.36
+              ansible_user: ubuntu
+              ansible_port: 22
+
+    sample_app_hosts:
+      children:
+        sample_staging:
+          hosts:
+            sample-staging-01:
+              ansible_host: 192.0.2.42
+              ansible_user: ubuntu
+              ansible_port: 22
+        sample_production:
+          hosts:
+            sample-prod-01:
+              ansible_host: 192.0.2.41
+              ansible_user: ubuntu
+              ansible_port: 22

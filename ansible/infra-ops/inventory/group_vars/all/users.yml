@@ -1,0 +1,11 @@
+---
+managed_users:
+  - name: ansible
+    state: present
+    groups: []
+    shell: /bin/bash
+    home: /home/ansible
+    sudo: false
+    sudo_nopasswd: false
+    authorized_keys:
+      - ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLEKEYPLACEHOLDER000000000000000000000000000 ansible-operator@example.invalid

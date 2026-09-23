@@ -1,0 +1,9 @@
+---
+# Copy to secrets/sample-staging/access.yml, replace these example keys, and
+# retain mode 0600. Do not put private keys in this file.
+sample_app_operator_ssh_public_keys:
+  - "ssh-ed25519 AAAA... operator"
+sample_app_developer_ssh_public_keys:
+  - "ssh-ed25519 AAAA... developer"
+sample_app_deploy_ssh_public_keys:
+  - "ssh-ed25519 AAAA... deploy"

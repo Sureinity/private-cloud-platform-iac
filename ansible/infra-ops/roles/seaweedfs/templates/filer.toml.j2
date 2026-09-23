@@ -1,0 +1,16 @@
+# Managed by Ansible — do not edit by hand.
+# SeaweedFS Filer Configuration
+#
+# Put this file to one of the locations, with descending priority:
+#    ./filer.toml
+#    $HOME/.seaweedfs/filer.toml
+#    /etc/seaweedfs/filer.toml
+
+[filer.options]
+recursive_delete = false
+
+[leveldb2]
+# Local on-disk metadata store for single-node setup.
+# Directly maps filer metadata to persistent storage partition.
+enabled = true
+dir = "{{ seaweedfs_data_mount_point }}/filer"

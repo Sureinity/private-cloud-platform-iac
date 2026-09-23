@@ -1,0 +1,252 @@
+# ==============================================================================
+# Terraform Live Environment Configuration (onprem-pve)
+# ==============================================================================
+# State Backend Note:
+# Remote state is stored in SeaweedFS S3 (bucket: platform-tfstate, configured in backend.tf).
+# Terraform backend blocks cannot read input variables from terraform.tfvars.
+# Backend credentials are maintained in backend.tfvars (mode 0600, ignored by git)
+# or supplied via AWS_ACCESS_KEY_ID / AWS_SECRET_ACCESS_KEY environment variables.
+# Source credentials from ansible/infra-ops/secrets/seaweedfs/admin.yml.
+# Template available at backend.tfvars.example.
+# Initialize backend with: terraform init -backend-config=backend.tfvars
+# ==============================================================================
+
+
+proxmox_api_token = "root@pam!tf=<token-uuid>"
+proxmox_endpoint  = "https://192.0.2.10:8006"
+proxmox_insecure  = true
+
+target_node_name = "pve"
+
+# Datastore IDs available on node "pve":
+#   local-lvm  LVM thin pool on the internal SSD, ~140.9 GiB
+#   usb-ssd    external USB SSD directory storage, ~439 GiB, images only
+#   local      dir storage for ISOs and imported cloud images
+# usb-ssd is managed out of band with pvesm, not by Terraform.
+# See docs/reference/usb-ssd-datastore.md before placing guests on it.
+
+vmbr0_name    = "vmbr0"
+vmbr0_ports   = ["nic0"]
+vmbr0_address = null
+vmbr0_gateway = null
+
+opnsense_lan_bridge_name    = "vmbr1"
+opnsense_lan_bridge_gateway = "192.0.2.1"
+opnsense_lan_bridge_address = "192.0.2.10/24"
+opnsense_vm_id                 = 100
+opnsense_vm_name               = "opnsense"
+opnsense_disk_datastore_id     = "local-lvm"
+opnsense_efi_disk_datastore_id = "local-lvm"
+opnsense_bios                  = "ovmf"
+opnsense_cdrom_file_id         = "local:iso/OPNsense-26.1.6-dvd-amd64.iso"
+opnsense_boot_order            = ["scsi0"]
+opnsense_memory_mb             = 2048
+opnsense_cpu_cores             = 2
+opnsense_disk_size_gb          = 24
+opnsense_started               = true
+opnsense_on_boot               = true
+
+
+cloud_init_password_file = "/home/operator/.secrets/lab-vm/pass.txt"
+
+download_timeout_seconds = 1800
+import_datastore_id      = "local"
+
+debian_cloud_image_filename = "debian-13-generic-amd64-20260220-2394.qcow2"
+debian_cloud_image_url      = "https://cdimage.debian.org/images/cloud/trixie/20260220-2394/debian-13-generic-amd64-20260220-2394.qcow2"
+
+ubuntu_cloud_image_filename = "resolute-server-cloudimg-amd64.qcow2"
+ubuntu_cloud_image_url      = "https://cloud-images.ubuntu.com/resolute/current/resolute-server-cloudimg-amd64.img"
+
+sandbox_sync_bridge_name = "vmbrsync"
+
+
+helper_vm_id                      = 110
+helper_vm_name                    = "helper-vm"
+helper_vm_disk_datastore_id       = "local-lvm"
+helper_vm_efi_disk_datastore_id   = "local-lvm"
+helper_vm_bios                    = "ovmf"
+helper_vm_cloud_init_datastore_id = "local-lvm"
+helper_vm_cloud_init_username     = "debian"
+helper_vm_cpu_cores               = 1
+helper_vm_disk_size_gb            = 8
+helper_vm_ipv4_address            = "dhcp"
+helper_vm_ipv4_gateway            = null
+helper_vm_memory_mb               = 512
+helper_vm_started                 = false
+helper_vm_on_boot                 = false
+helper_vm_ssh_public_keys = [
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLEKEYPLACEHOLDER000000000000000000000000000 lab-operator@example.invalid",
+]
+
+zabbix_vm_cloud_init_datastore_id = "local-lvm"
+zabbix_vm_cloud_init_username     = "debian"
+zabbix_vm_cpu_cores               = 1
+zabbix_vm_disk_datastore_id       = "local-lvm"
+zabbix_vm_efi_disk_datastore_id   = "local-lvm"
+zabbix_vm_bios                    = "ovmf"
+zabbix_vm_disk_size_gb            = 10
+zabbix_vm_dns_servers             = ["8.8.8.8", "1.1.1.1"]
+zabbix_vm_ipv4_gateway            = "192.0.2.1"
+zabbix_vm_memory_mb               = 1024
+zabbix_vm_started                 = true
+zabbix_vm_on_boot                 = false
+zabbix_vm_ssh_public_keys = [
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLEKEYPLACEHOLDER000000000000000000000000000 lab-operator@example.invalid",
+]
+n8n_server_vm_id                    = 140
+n8n_server_vm_name                  = "n8n-prod"
+n8n_server_cloud_init_datastore_id  = "local-lvm"
+n8n_server_cloud_init_username      = "ubuntu"
+n8n_server_cpu_cores                = 1
+n8n_server_disk_datastore_id        = "local-lvm"
+n8n_server_efi_disk_datastore_id    = "local-lvm"
+n8n_server_bios                     = "ovmf"
+n8n_server_disk_size_gb             = 20
+n8n_server_dns_servers              = ["192.0.2.1"]
+n8n_server_ipv4_address             = "192.0.2.40/24"
+n8n_server_ipv4_gateway             = "192.0.2.1"
+n8n_server_memory_mb                = 2048
+n8n_server_started                  = true
+n8n_server_on_boot                  = true
+n8n_server_startup_order            = 40
+n8n_server_ssh_public_keys = [
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLEKEYPLACEHOLDER000000000000000000000000000 lab-operator@example.invalid",
+]
+
+managed_client_cloud_init_datastore_id = "local-lvm"
+managed_client_cloud_init_username     = "ubuntu"
+managed_client_cpu_cores               = 1
+managed_client_disk_datastore_id       = "local-lvm"
+managed_client_efi_disk_datastore_id   = "local-lvm"
+managed_client_bios                    = "ovmf"
+managed_client_disk_size_gb            = 10
+managed_client_dns_servers             = ["8.8.8.8", "1.1.1.1"]
+managed_client_ipv4_gateway            = "192.0.2.1"
+managed_client_memory_mb               = 1024
+managed_client_started                 = false
+managed_client_on_boot                 = false
+managed_client_ssh_public_keys = [
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLEKEYPLACEHOLDER000000000000000000000000000 lab-operator@example.invalid",
+]
+managed_clients = {
+  client01 = {
+    vm_id         = 133
+    vm_name       = "zbx-client-01"
+    description   = "Ubuntu managed client for Ansible Zabbix Agent 2 automation testing"
+    ipv4_address  = "192.0.2.33/24"
+    startup_order = 33
+    tags          = ["client01", "ansible"]
+  }
+  client02 = {
+    vm_id         = 134
+    vm_name       = "zbx-client-02"
+    description   = "Ubuntu managed client for Ansible Zabbix Agent 2 automation testing"
+    ipv4_address  = "192.0.2.34/24"
+    startup_order = 34
+    tags          = ["client02", "ansible"]
+  }
+  client03 = {
+    vm_id         = 135
+    vm_name       = "zbx-client-03"
+    description   = "Ubuntu managed client for Ansible Zabbix Agent 2 automation testing"
+    ipv4_address  = "192.0.2.35/24"
+    startup_order = 35
+    tags          = ["client03", "ansible"]
+  }
+  client04 = {
+    vm_id         = 136
+    vm_name       = "zbx-client-04"
+    description   = "Ubuntu managed client for Ansible Zabbix Agent 2 automation testing"
+    ipv4_address  = "192.0.2.36/24"
+    startup_order = 36
+    tags          = ["client04", "ansible"]
+  }
+}
+
+zabbix_monolith_vm_id                    = 130
+zabbix_monolith_vm_name                  = "zbx-monolith"
+zabbix_monolith_cloud_init_datastore_id  = "local-lvm"
+zabbix_monolith_cloud_init_username      = "debian"
+zabbix_monolith_cpu_cores                = 2
+zabbix_monolith_disk_datastore_id        = "local-lvm"
+zabbix_monolith_efi_disk_datastore_id    = "local-lvm"
+zabbix_monolith_vm_bios                  = "ovmf"
+zabbix_monolith_disk_size_gb             = 20
+zabbix_monolith_dns_servers              = ["8.8.8.8", "1.1.1.1"]
+zabbix_monolith_image_key                = "ubuntu"
+zabbix_monolith_ipv4_address             = "192.0.2.30/24"
+zabbix_monolith_ipv4_gateway             = "192.0.2.1"
+zabbix_monolith_memory_mb                = 2048
+zabbix_monolith_started                  = false
+zabbix_monolith_on_boot                  = false
+zabbix_monolith_ssh_public_keys = [
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLEKEYPLACEHOLDER000000000000000000000000000 lab-operator@example.invalid",
+]
+
+zabbix_vms_enabled = false
+zabbix_vms = {
+  database = {
+    vm_id         = 130
+    vm_name       = "zbx-db"
+    description   = "Manual Zabbix database VM"
+    ipv4_address  = "192.0.2.30/24"
+    startup_order = 30
+    tags          = ["database"]
+  }
+  server = {
+    vm_id         = 131
+    vm_name       = "zbx-server"
+    description   = "Manual Zabbix server VM"
+    ipv4_address  = "192.0.2.31/24"
+    startup_order = 31
+    tags          = ["server"]
+  }
+  frontend = {
+    vm_id         = 132
+    vm_name       = "zbx-frontend"
+    description   = "Manual Zabbix frontend VM"
+    ipv4_address  = "192.0.2.32/24"
+    startup_order = 32
+    tags          = ["frontend"]
+  }
+  client = {
+    vm_id         = 133
+    vm_name       = "zbx-client-01"
+    description   = "Manual Zabbix monitored client VM"
+    ipv4_address  = "192.0.2.33/24"
+    startup_order = 33
+    tags          = ["client"]
+  }
+}
+
+
+# SampleApp isolated staging VM. The guide keeps this disabled until the real
+# staging VLAN/subnet, OPNsense rules, DNS policy, and VMID availability are
+# verified. Do not put passwords, private keys, Cloudflare credentials, or API
+# tokens in this file or in Terraform variables.
+opnsense_lan_bridge_vlan_aware              = false
+sample_staging_server_enabled              = false
+sample_staging_server_vm_id                = 142
+sample_staging_server_vm_name              = "sample-staging-01"
+sample_staging_server_cloud_init_datastore_id = "local-lvm"
+sample_staging_server_cloud_init_username  = "ubuntu"
+sample_staging_server_cpu_cores            = 2
+sample_staging_server_memory_mb            = 3072
+sample_staging_server_disk_datastore_id    = "local-lvm"
+sample_staging_server_efi_disk_datastore_id = "local-lvm"
+sample_staging_server_disk_size_gb         = 40
+sample_staging_server_bios                 = "ovmf"
+sample_staging_server_started              = true
+sample_staging_server_on_boot              = true
+sample_staging_server_startup_order        = 20
+
+# Before setting sample_staging_server_enabled = true, replace each null or
+# empty value with the approved non-secret staging allocation.
+sample_staging_server_vlan_id              = null
+sample_staging_server_ipv4_address         = null
+sample_staging_server_ipv4_gateway         = null
+sample_staging_server_dns_servers          = []
+sample_staging_server_ssh_public_keys = [
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLEKEYPLACEHOLDER000000000000000000000000000 lab-operator@example.invalid",
+]

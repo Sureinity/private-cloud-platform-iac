@@ -1,0 +1,30 @@
+---
+- name: Configure SampleApp application VM baseline
+  hosts: sample-app
+  become: true
+  gather_facts: true
+  pre_tasks:
+    - name: Assert operator bootstrap account is in the SSH allow-list
+      ansible.builtin.assert:
+        that:
+          - ansible_user in ssh_allowed_users
+        fail_msg: >-
+          ansible_user {{ ansible_user }} is not in ssh_allowed_users.
+          Preserve an independently verified operator SSH session before applying
+          SSH hardening.
+      tags: [sample_app, preflight]
+  roles:
+    - role: local_secrets
+      vars:
+        secret_env: "{{ sample_app_environment }}"
+        secret_vars_files:
+          - access.yml
+      tags: [secrets, preflight]
+    - role: docker
+      tags: [docker, sample_app]
+    - role: sample_app
+      tags: [sample_app]
+    - role: users
+      tags: [users, sample_app]
+    - role: ssh
+      tags: [ssh, sample_app]

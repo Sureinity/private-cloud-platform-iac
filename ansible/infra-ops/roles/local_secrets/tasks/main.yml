@@ -1,0 +1,36 @@
+---
+- name: Assert secret environment is defined
+  ansible.builtin.assert:
+    that:
+      - secret_env is defined
+      - secret_env | length > 0
+    fail_msg: "You must define 'secret_env' when using the local_secrets role."
+  tags: [secrets, preflight]
+
+- name: Check ignored secret payloads
+  ansible.builtin.stat:
+    path: "{{ playbook_dir }}/../secrets/{{ secret_env }}/{{ item }}"
+  delegate_to: localhost
+  become: false
+  register: local_secrets_payloads
+  loop: "{{ secret_vars_files }}"
+  tags: [secrets, preflight]
+
+- name: Assert ignored secret payloads are available and protected
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.isreg
+      - item.stat.mode == '0600'
+    fail_msg: >-
+      Create secrets/{{ secret_env }}/{{ item.item }} with mode 0600
+      before applying this playbook.
+  loop: "{{ local_secrets_payloads.results }}"
+  tags: [secrets, preflight]
+
+- name: Load ignored secret payloads
+  ansible.builtin.include_vars:
+    file: "{{ playbook_dir }}/../secrets/{{ secret_env }}/{{ item }}"
+  loop: "{{ secret_vars_files }}"
+  tags: [secrets, preflight]
+  no_log: true

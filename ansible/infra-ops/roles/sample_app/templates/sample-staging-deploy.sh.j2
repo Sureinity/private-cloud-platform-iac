@@ -1,0 +1,103 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+readonly APPLICATION_ROOT='{{ sample_app_application_root }}'
+readonly COMPOSE_FILE='{{ sample_app_compose_file }}'
+readonly ENVIRONMENT_FILE='{{ sample_app_env_file }}'
+readonly RELEASE_STATE_FILE='{{ sample_app_release_state_path }}'
+readonly LOCK_FILE='{{ sample_app_deployment_lock_path }}'
+readonly IMAGE_REPOSITORY='{{ sample_app_image_repository }}'
+readonly immutable_tag_pattern='{{ sample_app_deploy_image_tag_pattern }}'
+readonly GHCR_USERNAME='{{ sample_app_ghcr_username }}'
+readonly GHCR_CREDENTIALS_FILE='{{ sample_app_ghcr_credentials_path }}'
+
+usage() {
+  echo "Usage: $(basename "$0") <immutable image tag matching ${immutable_tag_pattern}>" >&2
+  exit 64
+}
+
+if [[ $# -ne 1 ]]; then
+  usage
+fi
+
+image_tag="$1"
+if [[ ! "$1" =~ $immutable_tag_pattern ]]; then
+  echo "Refusing invalid immutable image tag." >&2
+  exit 64
+fi
+
+for required_path in "${APPLICATION_ROOT}" "${COMPOSE_FILE}" "${ENVIRONMENT_FILE}" "${GHCR_CREDENTIALS_FILE}"; do
+  if [[ ! -e "${required_path}" ]]; then
+    echo "Required deployment path is missing: ${required_path}" >&2
+    exit 66
+  fi
+done
+
+if [[ ! -d "${APPLICATION_ROOT}" || ! -f "${COMPOSE_FILE}" || ! -f "${ENVIRONMENT_FILE}" || ! -f "${GHCR_CREDENTIALS_FILE}" ]]; then
+  echo "Deployment path type is invalid." >&2
+  exit 66
+fi
+
+if [[ "$(stat -c '%U:%G:%a' "${ENVIRONMENT_FILE}")" != 'root:root:600' ]]; then
+  echo "Protected runtime environment file metadata is invalid." >&2
+  exit 77
+fi
+
+if [[ "$(stat -c '%U:%G:%a' "${GHCR_CREDENTIALS_FILE}")" != 'root:root:600' ]]; then
+  echo "Host-side GHCR credential file metadata is invalid." >&2
+  exit 77
+fi
+
+install -d -o root -g root -m 0750 "$(dirname "${LOCK_FILE}")"
+exec 9>"${LOCK_FILE}"
+if ! flock -n 9; then
+  echo "Another SampleApp application deployment is already running." >&2
+  exit 75
+fi
+
+umask 077
+temporary_release_state="$(mktemp "${RELEASE_STATE_FILE}.XXXXXX")"
+cleanup() {
+  rm -f "${temporary_release_state}"
+}
+trap cleanup EXIT
+
+printf 'ATELIER_IMAGE=%s\nATELIER_IMAGE_TAG=%s\n' "${IMAGE_REPOSITORY}" "${image_tag}" > "${temporary_release_state}"
+install -o root -g root -m 0640 "${temporary_release_state}" "${RELEASE_STATE_FILE}"
+
+set -a
+# shellcheck disable=SC1090
+source "${ENVIRONMENT_FILE}"
+# shellcheck disable=SC1090
+source "${RELEASE_STATE_FILE}"
+set +a
+
+printf '%s' "$(<"${GHCR_CREDENTIALS_FILE}")" | docker login ghcr.io -u "${GHCR_USERNAME}" --password-stdin
+
+docker compose \
+  --project-directory "${APPLICATION_ROOT}" \
+  --env-file "${ENVIRONMENT_FILE}" \
+  --env-file "${RELEASE_STATE_FILE}" \
+  -f "${COMPOSE_FILE}" \
+  config -q
+
+docker compose \
+  --project-directory "${APPLICATION_ROOT}" \
+  --env-file "${ENVIRONMENT_FILE}" \
+  --env-file "${RELEASE_STATE_FILE}" \
+  -f "${COMPOSE_FILE}" \
+  pull sample-app
+
+docker compose \
+  --project-directory "${APPLICATION_ROOT}" \
+  --env-file "${ENVIRONMENT_FILE}" \
+  --env-file "${RELEASE_STATE_FILE}" \
+  -f "${COMPOSE_FILE}" \
+  up -d --no-build --remove-orphans
+
+docker compose \
+  --project-directory "${APPLICATION_ROOT}" \
+  --env-file "${ENVIRONMENT_FILE}" \
+  --env-file "${RELEASE_STATE_FILE}" \
+  -f "${COMPOSE_FILE}" \
+  ps

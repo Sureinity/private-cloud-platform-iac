@@ -1,0 +1,69 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for seaweedfs/user.yml
+# Stage 3: Service Identity (Least Privilege)
+#
+# Safety & Hardening Policy:
+# 1. System group and user with least privilege.
+# 2. Non-interactive shell (/usr/sbin/nologin).
+# 3. No sudo privileges or membership in administrative groups.
+# 4. Locks account out of interactive login while isolating local service state (/var/lib/seaweedfs) from persistent storage (/srv/seaweedfs).
+
+- name: Ensure SeaweedFS service group exists
+  tags:
+    - seaweedfs
+    - user
+    - security
+  ansible.builtin.group:
+    name: "{{ seaweedfs_group }}"
+    system: "{{ seaweedfs_system_user }}"
+    state: present
+
+- name: Ensure SeaweedFS service user exists with restricted privileges
+  tags:
+    - seaweedfs
+    - user
+    - security
+  ansible.builtin.user:
+    name: "{{ seaweedfs_user }}"
+    group: "{{ seaweedfs_group }}"
+    system: "{{ seaweedfs_system_user }}"
+    shell: "{{ seaweedfs_user_shell }}"
+    home: "{{ seaweedfs_user_home }}"
+    create_home: "{{ seaweedfs_user_create_home }}"
+    comment: "SeaweedFS system service account"
+    state: present
+
+- name: Ensure SeaweedFS service home directory exists with restricted permissions
+  tags:
+    - seaweedfs
+    - user
+    - security
+  ansible.builtin.file:
+    path: "{{ seaweedfs_user_home }}"
+    state: directory
+    owner: "{{ seaweedfs_user }}"
+    group: "{{ seaweedfs_group }}"
+    mode: "{{ seaweedfs_user_home_mode }}"
+
+- name: Verify SeaweedFS user has no interactive shell
+  tags:
+    - seaweedfs
+    - user
+    - security
+  ansible.builtin.getent:
+    database: passwd
+    key: "{{ seaweedfs_user }}"
+
+- name: Assert SeaweedFS user is locked to nologin
+  tags:
+    - seaweedfs
+    - user
+    - security
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.getent_passwd[seaweedfs_user][5] in ['/usr/sbin/nologin', '/bin/false', '/sbin/nologin']
+    fail_msg: >-
+      Security check failed: {{ seaweedfs_user }} shell is
+      '{{ ansible_facts.getent_passwd[seaweedfs_user][5] }}'. Must be non-interactive.
+    success_msg: "SeaweedFS user shell is correctly restricted to {{ ansible_facts.getent_passwd[seaweedfs_user][5] }}."

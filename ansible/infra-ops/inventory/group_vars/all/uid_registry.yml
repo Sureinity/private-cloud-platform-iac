@@ -1,0 +1,69 @@
+---
+# /roles/users/
+# UID and GID registry. Source of truth for numeric identity.
+#
+# Policy: docs/reference/uid-gid-allocation-policy.md
+# Procedures: docs/how-to/manage-uid-allocations.md
+#
+# Ranges:
+#   0-999          system, distribution owned, do not allocate
+#   1000-1099      cloud image reserved, do not allocate
+#   1100-1999      buffer
+#   2000-2999      human accounts
+#   3000-3999      service accounts
+#   4000-4999      shared group IDs only
+#   100000+        subuid/subgid, do not allocate
+#
+# Rules:
+#   - gid equals uid for every managed account
+#   - a live number is never changed
+#   - a retired number is never reissued, and its entry is kept
+#
+# STATUS: PROVISIONAL. The live-host audit in the how-to guide has not been
+# run, because the 192.0.2.0/24 management subnet was unreachable from the
+# control node when this file was written. Run the audit and reconcile these
+# numbers before creating any account from this registry.
+
+uid_registry:
+  ansible:
+    uid: 3000
+    gid: 3000
+    class: service
+    description: Ansible automation account used for configuration management.
+
+  ubuntu:
+    uid: 1000
+    gid: 1000
+    class: preexisting
+    description: Ubuntu cloud-image operator and Ansible bootstrap account on sample-staging-01.
+
+  azureuser:
+    uid: 1000
+    gid: 1000
+    class: preexisting
+    description: Azure Ubuntu cloud-image operator and Ansible bootstrap account on sample-app-prod-01.
+
+  developer:
+    uid: 2000
+    gid: 2000
+    class: human
+    description: Dedicated SampleApp staging developer account with Docker-group access.
+
+  sample-deploy:
+    uid: 3001
+    gid: 3001
+    class: service
+    description: Dedicated non-interactive SampleApp staging deployment account.
+
+  # pve-admin:
+  #   uid: 2000
+  #   gid: 2000
+  #   class: human
+  #   description: >-
+  #     Administrative account on the Proxmox host, replacing direct root SSH.
+  #     Root login stays enabled until an independent session as this account
+  #     is verified. See the ordering rules in the policy.
+
+# Shared groups for cross-host data ownership. Group IDs only.
+# Do not use the docker group here; its GID differs per host.
+gid_registry: {}

@@ -1,0 +1,41 @@
+# Bootstrap-only Terraform inputs. Keep the active tfvars file local and ignored.
+# Do not configure this root with the SeaweedFS backend it provisions.
+proxmox_api_token = "root@pam!tf=<token-uuid>"
+proxmox_endpoint  = "https://192.0.2.10:8006"
+proxmox_insecure  = false
+
+target_node_name = "pve"
+
+# Select and verify these values with live PVE inspection before planning.
+seaweedfs_vm_id         = 151
+seaweedfs_vm_name       = "seaweedfs-state"
+seaweedfs_bridge_name   = "vmbr1"
+seaweedfs_ipv4_address  = "192.0.2.51/24"
+seaweedfs_ipv4_gateway  = "192.0.2.1"
+seaweedfs_dns_servers   = ["192.0.2.1"]
+seaweedfs_endpoint_hostname = "seaweedfs.example.invalid"
+
+seaweedfs_bios                    = "ovmf"
+seaweedfs_cpu_cores               = 2
+seaweedfs_memory_mb               = 1024
+seaweedfs_boot_disk_size_gb       = 20
+seaweedfs_boot_disk_datastore_id  = "local-lvm"
+seaweedfs_data_disk_size_gb       = 100
+seaweedfs_data_disk_datastore_id  = "usb-ssd"
+seaweedfs_data_disk_interface     = "scsi1"
+seaweedfs_efi_disk_datastore_id   = "local-lvm"
+seaweedfs_cloud_init_datastore_id = "local-lvm"
+seaweedfs_cloud_init_interface    = "scsi2"
+seaweedfs_cloud_init_username     = "ubuntu"
+seaweedfs_startup_order            = 50
+seaweedfs_started                  = true
+seaweedfs_on_boot                  = true
+seaweedfs_agent_enabled            = true
+seaweedfs_protection               = true
+
+cloud_init_password_file = "/home/operator/.secrets/lab-vm/pass.txt"
+seaweedfs_ssh_public_keys = [
+  "ssh-ed25519 <operator-public-key> home-vm",
+]
+
+import_image_file_id = "local:import/ubuntu-26.04-server-cloudimg-amd64.qcow2"

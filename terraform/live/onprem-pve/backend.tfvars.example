@@ -1,0 +1,31 @@
+# ==============================================================================
+# SeaweedFS S3 Remote State Backend Configuration
+# ==============================================================================
+# This file provides credentials for the SeaweedFS S3-compatible state backend.
+#
+# Backend block is defined in backend.tf:
+#   bucket   = "sample-tfstate"
+#   key      = "live/onprem-pve/terraform.tfstate"
+#   endpoint = "http://192.0.2.51:8333"
+#
+# Credentials location:
+#   Ansible secrets payload at ansible/infra-ops/secrets/seaweedfs/admin.yml:
+#     - seaweedfs_s3_admin_access_key -> access_key
+#     - seaweedfs_s3_admin_secret_key -> secret_key
+#
+# Usage:
+#   1. Copy this template to backend.tfvars (ignored by git):
+#      cp backend.tfvars.example backend.tfvars
+#      chmod 0600 backend.tfvars
+#   2. Populate access_key and secret_key from the Ansible secrets file.
+#   3. Initialize or migrate Terraform state:
+#      terraform init -backend-config=backend.tfvars
+#
+# Alternatively, supply credentials via standard environment variables:
+#   export AWS_ACCESS_KEY_ID="<ACCESS_KEY>"
+#   export AWS_SECRET_ACCESS_KEY="<SECRET_KEY>"
+#   terraform init
+# ==============================================================================
+
+access_key = "<SEAWEEDFS_S3_ACCESS_KEY>"
+secret_key = "<SEAWEEDFS_S3_SECRET_KEY>"

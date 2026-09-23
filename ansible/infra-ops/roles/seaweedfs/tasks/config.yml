@@ -1,0 +1,124 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for seaweedfs/config.yml
+# Stage 5: Configuration & Secrets (Decoupled State)
+#
+# Principles:
+# 1. Decouple public host settings (ports, paths, volume quota) from sensitive credentials.
+# 2. Public settings live in the world-readable systemd unit (/etc/systemd/system/seaweedfs.service).
+# 3. Sensitive credentials (S3 admin keys and tokens) live in sealed files (mode 0600)
+#    owned strictly by seaweedfs:seaweedfs (/etc/seaweedfs/seaweedfs.env, /etc/seaweedfs/s3.json).
+# 4. Command-line arguments in ps aux are sanitized of passwords/keys.
+
+- name: Ensure SeaweedFS configuration directory exists
+  tags:
+    - seaweedfs
+    - config
+  ansible.builtin.file:
+    path: "{{ seaweedfs_config_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy SeaweedFS filer configuration file
+  tags:
+    - seaweedfs
+    - config
+    - filer
+  ansible.builtin.template:
+    src: filer.toml.j2
+    dest: "{{ seaweedfs_filer_config_file }}"
+    owner: root
+    group: root
+    mode: "0644"
+  notify: Restart seaweedfs
+
+- name: Deploy SeaweedFS sensitive environment file
+  tags:
+    - seaweedfs
+    - config
+    - secrets
+  ansible.builtin.template:
+    src: seaweedfs.env.j2
+    dest: "{{ seaweedfs_env_file }}"
+    owner: "{{ seaweedfs_user }}"
+    group: "{{ seaweedfs_group }}"
+    mode: "0600"
+  no_log: true
+  notify: Restart seaweedfs
+
+- name: Deploy SeaweedFS S3 credentials configuration
+  tags:
+    - seaweedfs
+    - config
+    - secrets
+  ansible.builtin.template:
+    src: s3.json.j2
+    dest: "{{ seaweedfs_s3_config_file }}"
+    owner: "{{ seaweedfs_user }}"
+    group: "{{ seaweedfs_group }}"
+    mode: "0600"
+  no_log: true
+  notify: Restart seaweedfs
+
+- name: Inspect permissions on SeaweedFS credentials files
+  tags:
+    - seaweedfs
+    - config
+    - secrets
+    - security
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ seaweedfs_env_file }}"
+    - "{{ seaweedfs_s3_config_file }}"
+  register: _seaweedfs_secret_files_stat
+  no_log: true
+
+- name: Assert credentials files are strictly mode 0600 and service-owned
+  tags:
+    - seaweedfs
+    - config
+    - secrets
+    - security
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.isreg
+      - item.stat.mode == '0600'
+      - item.stat.pw_name == seaweedfs_user
+      - item.stat.gr_name == seaweedfs_group
+    fail_msg: >-
+      Security failure: credentials file {{ item.item }} is not mode 0600
+      or not owned by {{ seaweedfs_user }}:{{ seaweedfs_group }}.
+    success_msg: "Credentials file {{ item.item }} verified secure (0600, {{ seaweedfs_user }}:{{ seaweedfs_group }})."
+  loop: "{{ _seaweedfs_secret_files_stat.results }}"
+  loop_control:
+    label: "{{ item.item }}"
+
+- name: Deploy SeaweedFS systemd unit file
+  tags:
+    - seaweedfs
+    - config
+    - systemd
+  ansible.builtin.template:
+    src: seaweedfs.service.j2
+    dest: "/etc/systemd/system/seaweedfs.service"
+    owner: root
+    group: root
+    mode: "0644"
+  notify:
+    - Reload systemd
+    - Restart seaweedfs
+
+- name: Ensure SeaweedFS service is enabled and started
+  tags:
+    - seaweedfs
+    - config
+    - service
+  ansible.builtin.systemd_service:
+    name: seaweedfs
+    enabled: "{{ seaweedfs_service_enabled }}"
+    state: "{{ seaweedfs_service_state }}"
+    daemon_reload: true

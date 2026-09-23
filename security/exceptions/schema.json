@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "SecurityException",
+  "description": "Schema for auditable, expiring security scanner exceptions in the Home PVE pipeline.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "id",
+    "tool",
+    "severity",
+    "owner",
+    "approved_by",
+    "created_at",
+    "expires_at",
+    "path",
+    "rationale"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0.0"]
+    },
+    "id": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_.:-]+$",
+      "description": "Rule or vulnerability identifier (e.g. CKV2_ANSIBLE_1, CVE-2026-1234, trivy-rule-id)."
+    },
+    "tool": {
+      "type": "string",
+      "enum": ["checkov", "trivy", "tflint", "gitleaks", "zizmor", "other"],
+      "description": "Security scanner or linter that surfaced the finding."
+    },
+    "severity": {
+      "type": "string",
+      "enum": ["CRITICAL", "HIGH", "MEDIUM", "LOW", "INFORMATIONAL"],
+      "description": "Assigned severity of the finding."
+    },
+    "owner": {
+      "type": "string",
+      "minLength": 3,
+      "description": "Maintainer handle responsible for the exception and its remediation."
+    },
+    "approved_by": {
+      "type": "string",
+      "minLength": 3,
+      "description": "Repository approver who authorized the exception."
+    },
+    "created_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "Date the exception was created (YYYY-MM-DD)."
+    },
+    "expires_at": {
+      "type": "string",
+      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "description": "Hard expiration date for the exception (YYYY-MM-DD)."
+    },
+    "path": {
+      "type": "string",
+      "minLength": 3,
+      "description": "Repo-relative path to the affected file. Must not be a root or wildcard glob."
+    },
+    "resource": {
+      "type": "string",
+      "description": "Optional specific resource identifier, task name, or stanza within the file."
+    },
+    "rationale": {
+      "type": "string",
+      "minLength": 20,
+      "description": "Technical justification explaining why the finding cannot be immediately resolved."
+    },
+    "remediation_ticket": {
+      "type": "string",
+      "description": "Tracking milestone, issue, or roadmap phase that will remediate the underlying debt."
+    }
+  }
+}

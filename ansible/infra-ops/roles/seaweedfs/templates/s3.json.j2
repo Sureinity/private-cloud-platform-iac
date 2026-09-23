@@ -1,0 +1,22 @@
+{
+  "identities": [
+    {
+      "name": "{{ seaweedfs_s3_admin_identity_name }}",
+      "credentials": [
+        {
+          "accessKey": "{{ seaweedfs_s3_admin_access_key }}",
+          "secretKey": "{{ seaweedfs_s3_admin_secret_key }}"
+        }
+      ],
+      "actions": [
+        "Admin",
+        "Read",
+        "Write",
+        "List",
+        "Tagging"
+      ]
+    }{% if seaweedfs_s3_extra_identities | default([]) | length > 0 %},{% for id in seaweedfs_s3_extra_identities %}
+    {{ id | to_nice_json }}{% if not loop.last %},{% endif %}
+    {% endfor %}{% endif %}
+  ]
+}

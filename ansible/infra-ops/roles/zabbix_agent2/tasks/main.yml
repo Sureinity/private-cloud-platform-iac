@@ -1,0 +1,82 @@
+---
+- name: Assert target host is Ubuntu or Debian
+  tags:
+    - zabbix_agent2
+  ansible.builtin.assert:
+    that:
+      - ansible_os_family == "Debian"
+      - ansible_distribution in zabbix_agent2_supported_distributions
+    fail_msg: >-
+      The zabbix_agent2 role supports Ubuntu and Debian hosts only.
+      Detected {{ ansible_distribution }} / {{ ansible_os_family }}.
+    success_msg: "Target host is Ubuntu or Debian."
+
+- name: Assert a real Zabbix server address was provided
+  tags:
+    - zabbix_agent2
+  ansible.builtin.assert:
+    that:
+      - zabbix_server_address != "MONITORING_HOST"
+    fail_msg: >-
+      zabbix_server_address is still the placeholder 'MONITORING_HOST'.
+      Override it with the real Zabbix server domain, e.g.
+      -e zabbix_server_address=zabbix.example.com
+    success_msg: "zabbix_server_address is set to a non-placeholder value."
+
+- name: Add Zabbix repository signing key
+  tags:
+    - zabbix_agent2
+  ansible.builtin.get_url:
+    url: "https://repo.zabbix.com/zabbix-official-repo.key"
+    dest: /usr/share/keyrings/zabbix-official-repo.asc
+    owner: root
+    group: root
+    mode: "0644"
+    force: true  # Add checksum later if a published key hash is adopted.
+
+- name: Add Zabbix apt repository
+  tags:
+    - zabbix_agent2
+  ansible.builtin.apt_repository:
+    repo: "deb [signed-by=/usr/share/keyrings/zabbix-official-repo.asc] https://repo.zabbix.com/zabbix/{{ zabbix_version }}/{{ ansible_distribution | lower }} {{ ansible_distribution_release }} main"
+    filename: zabbix
+    state: present
+
+- name: Install zabbix-agent2
+  tags:
+    - zabbix_agent2
+  ansible.builtin.apt:
+    name: zabbix-agent2
+    state: present
+    update_cache: true
+
+- name: Ensure Zabbix Agent 2 include directory exists
+  tags:
+    - zabbix_agent2
+  ansible.builtin.file:
+    path: /etc/zabbix/zabbix_agent2.d/
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Deploy Zabbix Agent 2 configuration
+  tags:
+    - zabbix_agent2
+  ansible.builtin.template:
+    src: zabbix_agent2.conf.j2
+    dest: /etc/zabbix/zabbix_agent2.conf
+    owner: root
+    group: root
+    mode: "0644"
+    backup: true
+    validate: "zabbix_agent2 -c %s -T"
+  notify: Restart zabbix-agent2
+
+- name: Enable and start zabbix-agent2
+  tags:
+    - zabbix_agent2
+  ansible.builtin.systemd_service:
+    name: zabbix-agent2
+    enabled: true
+    state: started

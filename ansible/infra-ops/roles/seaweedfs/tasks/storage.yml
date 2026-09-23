@@ -1,0 +1,133 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for seaweedfs/storage.yml
+# Stage 2: Storage & Filesystem (The Stateful Boundary)
+#
+# Safety Policy:
+# 1. Inspect block device for existing filesystem.
+# 2. Refuse to format unless seaweedfs_format_disk is explicitly set to true.
+# 3. Mount filesystem anchored by UUID in /etc/fstab to protect against bus reordering.
+# 4. Scaffold subdirectories (master, volume, filer) with restricted permissions.
+
+- name: Inspect block device filesystem metadata
+  tags:
+    - seaweedfs
+    - storage
+  ansible.builtin.command:
+    cmd: "lsblk -no FSTYPE,UUID {{ seaweedfs_data_device }}"
+  register: _seaweedfs_disk_probe
+  changed_when: false
+
+- name: Parse filesystem type and UUID from disk probe
+  tags:
+    - seaweedfs
+    - storage
+  ansible.builtin.set_fact:
+    _seaweedfs_detected_fstype: "{{ (_seaweedfs_disk_probe.stdout.strip().split() | first) if (_seaweedfs_disk_probe.stdout.strip() | length > 0) else '' }}"
+    _seaweedfs_detected_uuid: "{{ (_seaweedfs_disk_probe.stdout.strip().split() | last) if (_seaweedfs_disk_probe.stdout.strip().split() | length > 1) else '' }}"
+
+- name: Assert disk has existing filesystem or explicit format permission is granted
+  tags:
+    - seaweedfs
+    - storage
+  ansible.builtin.assert:
+    that:
+      - (_seaweedfs_detected_fstype | length > 0) or seaweedfs_format_disk
+    fail_msg: >-
+      No filesystem detected on {{ seaweedfs_data_device }}. To protect stateful data,
+      Ansible refuses to format disks implicitly. To format this device as {{ seaweedfs_fs_type }},
+      set 'seaweedfs_format_disk: true' explicitly.
+    success_msg: >-
+      {{ 'Existing ' ~ _seaweedfs_detected_fstype ~ ' filesystem detected on ' ~ seaweedfs_data_device ~ '.'
+         if (_seaweedfs_detected_fstype | length > 0)
+         else 'No filesystem detected on ' ~ seaweedfs_data_device ~ ', but seaweedfs_format_disk is explicitly enabled.' }}
+
+- name: Format block device when explicitly opted in
+  tags:
+    - seaweedfs
+    - storage
+  community.general.filesystem:
+    dev: "{{ seaweedfs_data_device }}"
+    fstype: "{{ seaweedfs_fs_type }}"
+    force: false
+  when:
+    - _seaweedfs_detected_fstype | length == 0
+    - seaweedfs_format_disk
+
+- name: Re-probe block device UUID after format
+  tags:
+    - seaweedfs
+    - storage
+  ansible.builtin.command:
+    cmd: "lsblk -no FSTYPE,UUID {{ seaweedfs_data_device }}"
+  register: _seaweedfs_disk_reprobe
+  changed_when: false
+  when: _seaweedfs_detected_uuid | length == 0
+
+- name: Update filesystem fact with discovered UUID
+  tags:
+    - seaweedfs
+    - storage
+  ansible.builtin.set_fact:
+    _seaweedfs_active_uuid: >-
+      {{
+        _seaweedfs_detected_uuid
+        if (_seaweedfs_detected_uuid | length > 0)
+        else (_seaweedfs_disk_reprobe.stdout.strip().split() | last)
+      }}
+    _seaweedfs_active_fstype: >-
+      {{
+        _seaweedfs_detected_fstype
+        if (_seaweedfs_detected_fstype | length > 0)
+        else (_seaweedfs_disk_reprobe.stdout.strip().split() | first)
+      }}
+
+- name: Assert filesystem UUID was successfully determined
+  tags:
+    - seaweedfs
+    - storage
+  ansible.builtin.assert:
+    that:
+      - _seaweedfs_active_uuid is defined
+      - _seaweedfs_active_uuid | length > 0
+    fail_msg: >-
+      Failed to determine filesystem UUID for {{ seaweedfs_data_device }}.
+      Cannot safely mount filesystem without a stable UUID anchor.
+    success_msg: "Discovered filesystem UUID '{{ _seaweedfs_active_uuid }}' for {{ seaweedfs_data_device }}."
+
+- name: Ensure persistent mount point directory exists
+  tags:
+    - seaweedfs
+    - storage
+  ansible.builtin.file:
+    path: "{{ seaweedfs_data_mount_point }}"
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+
+- name: Mount persistent data filesystem by UUID in fstab
+  tags:
+    - seaweedfs
+    - storage
+  ansible.posix.mount:
+    path: "{{ seaweedfs_data_mount_point }}"
+    src: "UUID={{ _seaweedfs_active_uuid }}"
+    fstype: "{{ _seaweedfs_active_fstype | default(seaweedfs_fs_type) }}"
+    opts: "{{ seaweedfs_mount_options }}"
+    state: mounted
+    backup: true
+
+- name: Scaffold SeaweedFS persistent subdirectories
+  tags:
+    - seaweedfs
+    - storage
+  ansible.builtin.file:
+    path: "{{ seaweedfs_data_mount_point }}/{{ item }}"
+    state: directory
+    owner: "{{ seaweedfs_user }}"
+    group: "{{ seaweedfs_group }}"
+    mode: "{{ seaweedfs_dir_mode }}"
+  loop: "{{ seaweedfs_data_subdirs }}"
+  loop_control:
+    label: "{{ seaweedfs_data_mount_point }}/{{ item }}"

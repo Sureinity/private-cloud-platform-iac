@@ -1,0 +1,8 @@
+---
+# /roles/ssh/
+# Baseline SSH daemon configuration for all managed hosts
+ssh_port: 22
+ssh_permit_root_login: "no"
+ssh_password_authentication: "no"
+ssh_pubkey_authentication: "yes"
+ssh_allowed_users: []

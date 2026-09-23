@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: MIT-0
+---
+- name: Deploy and configure SeaweedFS
+  hosts: "{{ target | default('seaweedfs_hosts') }}"
+  become: true
+  gather_facts: true
+  roles:
+    - role: local_secrets
+      vars:
+        secret_env: "seaweedfs"
+        secret_vars_files: >-
+          {{
+            ['admin.yml', 'cloudflare.yml']
+            if (seaweedfs_tls_enabled | default(false) and (seaweedfs_tls_certificate_source | default('acme_dns01') == 'acme_dns01'))
+            else ['admin.yml']
+          }}
+      tags: [secrets, preflight]
+    - role: seaweedfs
+      tags:
+        - seaweedfs

@@ -1,0 +1,26 @@
+---
+# ==============================================================================
+# .ansible-lint - Ansible Linter Configuration
+# ==============================================================================
+# Profile and rule overrides for private onprem-pve infrastructure automation:
+# - Exclude uninstantiated galaxy boilerplate tests
+# - Skip public Galaxy publishing metadata checks (meta-incorrect)
+# - Skip opinionated role variable prefixing for shared registries
+# - Delegate YAML formatting checks to .yamllint.yml
+# ==============================================================================
+profile: basic
+
+exclude_paths:
+  - "roles/*/tests/**"
+  - ".ansible/**"
+
+skip_list:
+  - meta-incorrect            # In-house roles are not published to Ansible Galaxy
+  - var-naming                # Allow shared variable names (uid_registry, etc.) without role prefix
+  - command-instead-of-module # Allow read-only verification commands (systemctl is-active)
+  - name[play]                # Allow import_playbook entries in site.yml
+  - name[casing]              # Allow existing handler casing
+  - yaml                      # Handled by standalone yamllint with .yamllint.yml
+
+warn_list:
+  - experimental

@@ -1,0 +1,249 @@
+# SPDX-License-Identifier: MIT-0
+---
+# tasks file for seaweedfs/tls.yml
+# Stage 5b: TLS & HTTPS Configuration
+#
+# Principles:
+# 1. Provide encryption in transit for S3 API traffic (port :8334 or :8333).
+# 2. Support multiple certificate sources: ACME DNS-01 (Cloudflare), local secret payload, or self-signed.
+# 3. Maintain strict least-privilege permissions: private key mode 0600 owned by seaweedfs:seaweedfs.
+# 4. Integrate renewal hooks to restart or reload seaweedfs on certificate rotation.
+
+- name: Ensure SeaweedFS TLS directory exists
+  tags:
+    - seaweedfs
+    - tls
+    - security
+  ansible.builtin.file:
+    path: "{{ seaweedfs_tls_dir }}"
+    state: directory
+    owner: root
+    group: "{{ seaweedfs_group }}"
+    mode: "0750"
+
+# -----------------------------------------------------------------------------
+# Path 1: ACME DNS-01 via Cloudflare
+# -----------------------------------------------------------------------------
+- name: Assert Cloudflare API token is provided for ACME DNS-01
+  tags:
+    - seaweedfs
+    - tls
+    - acme
+  ansible.builtin.assert:
+    that:
+      - seaweedfs_cloudflare_api_token | default('') | length > 0
+    fail_msg: >-
+      seaweedfs_cloudflare_api_token is required when seaweedfs_tls_certificate_source is 'acme_dns01'.
+      Provide it in secrets/seaweedfs/cloudflare.yml or via Ansible Vault.
+  when: seaweedfs_tls_certificate_source == 'acme_dns01'
+
+- name: Install Certbot and Cloudflare DNS plugin packages
+  tags:
+    - seaweedfs
+    - tls
+    - acme
+  ansible.builtin.apt:
+    name:
+      - certbot
+      - python3-certbot-dns-cloudflare
+    state: present
+    update_cache: false
+  when: seaweedfs_tls_certificate_source == 'acme_dns01'
+
+- name: Deploy Cloudflare API credentials file for Certbot
+  tags:
+    - seaweedfs
+    - tls
+    - acme
+    - secrets
+  ansible.builtin.copy:
+    content: |
+      # Managed by Ansible — do not edit by hand.
+      dns_cloudflare_api_token = {{ seaweedfs_cloudflare_api_token }}
+    dest: "{{ seaweedfs_config_dir }}/cloudflare.ini"
+    owner: root
+    group: root
+    mode: "0600"
+  no_log: true
+  when: seaweedfs_tls_certificate_source == 'acme_dns01'
+
+- name: Ensure Certbot renewal hook directory exists
+  tags:
+    - seaweedfs
+    - tls
+    - acme
+  ansible.builtin.file:
+    path: /etc/letsencrypt/renewal-hooks/post
+    state: directory
+    owner: root
+    group: root
+    mode: "0755"
+  when: seaweedfs_tls_certificate_source == 'acme_dns01'
+
+- name: Deploy Certbot renewal post-hook for SeaweedFS
+  tags:
+    - seaweedfs
+    - tls
+    - acme
+  ansible.builtin.template:
+    src: seaweedfs-certbot-hook.sh.j2
+    dest: /etc/letsencrypt/renewal-hooks/post/seaweedfs-reload.sh
+    owner: root
+    group: root
+    mode: "0750"
+  when: seaweedfs_tls_certificate_source == 'acme_dns01'
+
+- name: Check if Let's Encrypt certificate already exists for endpoint
+  tags:
+    - seaweedfs
+    - tls
+    - acme
+  ansible.builtin.stat:
+    path: "/etc/letsencrypt/live/{{ seaweedfs_endpoint_hostname }}/fullchain.pem"
+  register: _seaweedfs_le_cert_stat
+  when: seaweedfs_tls_certificate_source == 'acme_dns01'
+
+- name: Issue Let's Encrypt TLS certificate via Cloudflare DNS-01
+  tags:
+    - seaweedfs
+    - tls
+    - acme
+  ansible.builtin.command: >-
+    certbot certonly
+    --dns-cloudflare
+    --dns-cloudflare-credentials {{ seaweedfs_config_dir }}/cloudflare.ini
+    --dns-cloudflare-propagation-seconds {{ seaweedfs_acme_propagation_seconds }}
+    -d {{ seaweedfs_endpoint_hostname }}
+    --email {{ seaweedfs_acme_email }}
+    --agree-tos
+    --non-interactive
+    {{ '--staging' if seaweedfs_acme_staging | bool else '' }}
+  changed_when: true
+  when:
+    - seaweedfs_tls_certificate_source == 'acme_dns01'
+    - not _seaweedfs_le_cert_stat.stat.exists
+  notify: Restart seaweedfs
+
+- name: Sync Let's Encrypt certificates to SeaweedFS TLS directory
+  tags:
+    - seaweedfs
+    - tls
+    - acme
+  ansible.builtin.command: /etc/letsencrypt/renewal-hooks/post/seaweedfs-reload.sh
+  when:
+    - seaweedfs_tls_certificate_source == 'acme_dns01'
+  changed_when: false
+
+# -----------------------------------------------------------------------------
+# Path 2: Operator-Supplied Certificate Payload
+# -----------------------------------------------------------------------------
+- name: Deploy operator-supplied TLS certificate
+  tags:
+    - seaweedfs
+    - tls
+    - secrets
+  ansible.builtin.copy:
+    src: "{{ seaweedfs_tls_local_cert_src }}"
+    dest: "{{ seaweedfs_s3_cert_file }}"
+    owner: root
+    group: "{{ seaweedfs_group }}"
+    mode: "0644"
+  notify: Restart seaweedfs
+  when: seaweedfs_tls_certificate_source == 'local_payload'
+
+- name: Deploy operator-supplied TLS private key
+  tags:
+    - seaweedfs
+    - tls
+    - secrets
+  ansible.builtin.copy:
+    src: "{{ seaweedfs_tls_local_key_src }}"
+    dest: "{{ seaweedfs_s3_key_file }}"
+    owner: "{{ seaweedfs_user }}"
+    group: "{{ seaweedfs_group }}"
+    mode: "0600"
+  no_log: true
+  notify: Restart seaweedfs
+  when: seaweedfs_tls_certificate_source == 'local_payload'
+
+- name: Deploy operator-supplied CA certificate if defined
+  tags:
+    - seaweedfs
+    - tls
+    - secrets
+  ansible.builtin.copy:
+    src: "{{ seaweedfs_tls_local_ca_src }}"
+    dest: "{{ seaweedfs_s3_cacert_file }}"
+    owner: root
+    group: "{{ seaweedfs_group }}"
+    mode: "0644"
+  notify: Restart seaweedfs
+  when:
+    - seaweedfs_tls_certificate_source == 'local_payload'
+    - seaweedfs_s3_cacert_file | default('') | length > 0
+    - seaweedfs_tls_local_ca_src | default('') | length > 0
+
+# -----------------------------------------------------------------------------
+# Path 3: Self-Signed Certificate (Offline / Staging / Test)
+# -----------------------------------------------------------------------------
+- name: Generate self-signed TLS private key and certificate
+  tags:
+    - seaweedfs
+    - tls
+  ansible.builtin.command: >-
+    openssl req -x509 -nodes -days 365 -newkey rsa:2048
+    -keyout {{ seaweedfs_s3_key_file }}
+    -out {{ seaweedfs_s3_cert_file }}
+    -subj "/CN={{ seaweedfs_endpoint_hostname }}"
+    -addext "subjectAltName=DNS:{{ seaweedfs_endpoint_hostname }},IP:{{ seaweedfs_ip | default(ansible_default_ipv4.address) }},IP:127.0.0.1"
+  args:
+    creates: "{{ seaweedfs_s3_key_file }}"
+  notify: Restart seaweedfs
+  when: seaweedfs_tls_certificate_source == 'self_signed'
+
+- name: Set permissions on self-signed TLS files
+  tags:
+    - seaweedfs
+    - tls
+    - security
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: "{{ item.mode }}"
+  loop:
+    - {path: "{{ seaweedfs_s3_cert_file }}", owner: "root", group: "{{ seaweedfs_group }}", mode: "0644"}
+    - {path: "{{ seaweedfs_s3_key_file }}", owner: "{{ seaweedfs_user }}", group: "{{ seaweedfs_group }}", mode: "0600"}
+  when: seaweedfs_tls_certificate_source == 'self_signed'
+
+# -----------------------------------------------------------------------------
+# Security & Ownership Verification
+# -----------------------------------------------------------------------------
+- name: Inspect permissions on SeaweedFS TLS key and certificate
+  tags:
+    - seaweedfs
+    - tls
+    - security
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ seaweedfs_s3_cert_file }}"
+    - "{{ seaweedfs_s3_key_file }}"
+  register: _seaweedfs_tls_files_stat
+  no_log: true
+
+- name: Assert TLS files exist and private key is strictly mode 0600 or 0640
+  tags:
+    - seaweedfs
+    - tls
+    - security
+  ansible.builtin.assert:
+    that:
+      - item.stat.exists
+      - item.stat.isreg
+      - (item.stat.mode in ['0600', '0640'] if 'key' in item.item else item.stat.mode in ['0644', '0640', '0600'])
+    fail_msg: "Security failure: TLS file {{ item.item }} does not exist or has insecure permissions."
+    success_msg: "TLS file {{ item.item }} verified secure."
+  loop: "{{ _seaweedfs_tls_files_stat.results }}"
+  loop_control:
+    label: "{{ item.item }}"

@@ -1,0 +1,8 @@
+---
+zabbix_version: "7.0"
+zabbix_agent_hostname: "{{ inventory_hostname }}"
+zabbix_server_address: "MONITORING_HOST"
+
+zabbix_agent2_supported_distributions:
+  - Ubuntu
+  - Debian

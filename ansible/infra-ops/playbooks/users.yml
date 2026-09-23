@@ -1,0 +1,7 @@
+---
+- name: Setup users
+  hosts: "{{ target | default('all') }}"
+  become: true
+  gather_facts: true
+  roles:
+    - users

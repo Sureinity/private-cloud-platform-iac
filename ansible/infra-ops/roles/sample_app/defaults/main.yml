@@ -1,0 +1,51 @@
+---
+sample_app_supported_distributions:
+  - Ubuntu
+
+
+
+sample_app_application_group: root
+sample_app_application_owner: root
+sample_app_application_root_mode: "0750"
+sample_app_release_state_owner: root
+sample_app_release_state_group: root
+sample_app_release_state_mode: "0640"
+sample_app_deploy_wrapper_path: /usr/local/sbin/sample-staging-deploy
+sample_app_deployment_wrapper_mode: "0755"
+sample_app_deploy_sudoers_path: /etc/sudoers.d/sample-staging-deploy
+sample_app_deployment_lock_path: /run/lock/sample-staging-deploy.lock
+sample_app_compose_file: "{{ sample_app_application_root }}/docker-compose.staging.yml"
+sample_app_image_repository: ghcr.io/zeraynce-studio/sample-app
+sample_app_deploy_image_tag_pattern: '^staging-[0-9a-f]{7,64}$'
+sample_app_ghcr_username: sample-staging
+sample_app_ghcr_credentials_path: /etc/sample-app/ghcr-pull-token
+sample_app_ghcr_credentials_source_path: "{{ sample_app_secrets_root }}/ghcr-pull-token"
+
+sample_app_environment: sample-staging
+sample_app_application_root: /srv/sample-app
+sample_app_release_state_path: "{{ sample_app_application_root }}/.release-state"
+sample_app_env_file: "{{ sample_app_application_root }}/.env.staging"
+sample_app_environment_owner: root
+sample_app_environment_group: root
+sample_app_environment_mode: "0600"
+sample_app_files_root: "{{ playbook_dir }}/../files/{{ sample_app_environment }}"
+sample_app_secrets_root: "{{ playbook_dir }}/../secrets/{{ sample_app_environment }}"
+sample_app_release_state_source_path: "{{ sample_app_files_root }}/release-state"
+sample_app_env_source_path: "{{ sample_app_secrets_root }}/.env.staging"
+sample_app_verify_tailscale: true
+
+sample_app_tailscale_service_name: tailscaled
+sample_app_tailscale_verify_command: /usr/bin/tailscale status --json
+sample_app_tailscale_hostname: "{{ sample_app_inventory_hostname | default(inventory_hostname) }}"
+
+
+
+# This role manages only host baseline configuration. Keep these false until a
+# separately approved role and runbook exists for each concern.
+sample_app_ansible_manages_application_deployment: false
+sample_app_ansible_manages_tailscale: false
+sample_app_ansible_manages_firewall: false
+sample_app_ansible_manages_dns: false
+sample_app_ansible_manages_ntp: false
+sample_app_ansible_manages_reboot_policy: false
+sample_app_monitoring_enabled: false

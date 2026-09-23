@@ -1,0 +1,332 @@
+#SPDX-License-Identifier: MIT-0
+---
+# tasks file for users
+#
+# Policy: docs/reference/uid-gid-allocation-policy.md
+#
+# Guard prelude runs first. Every check is a hard failure, because the
+# failure modes it prevents are not recoverable by rerunning the role.
+
+- name: Assert uid_registry is populated
+  tags:
+    - users
+    - uid_policy
+  ansible.builtin.assert:
+    that:
+      - uid_registry is mapping
+      - uid_registry | length > 0
+    fail_msg: >-
+      uid_registry is empty or undefined. Numeric identity must come from
+      inventory/group_vars/all/uid_registry.yml before this role can create
+      accounts.
+    success_msg: "uid_registry has {{ uid_registry | length }} entries."
+
+- name: Assert no duplicate UIDs in the registry
+  tags:
+    - users
+    - uid_policy
+  ansible.builtin.assert:
+    that:
+      - _users_all_uids | length == _users_all_uids | unique | length
+    fail_msg: >-
+      Duplicate UID in uid_registry. Allocated UIDs are
+      {{ _users_all_uids | sort }}. Each account must have a unique number.
+  vars:
+    _users_all_uids: "{{ uid_registry | dict2items | rejectattr('value.class', 'equalto', 'preexisting') | map(attribute='value.uid') | list }}"
+
+- name: Assert no duplicate GIDs across the registries
+  tags:
+    - users
+    - uid_policy
+  ansible.builtin.assert:
+    that:
+      - _users_all_gids | length == _users_all_gids | unique | length
+    fail_msg: >-
+      Duplicate GID across uid_registry and gid_registry. Allocated GIDs are
+      {{ _users_all_gids | sort }}.
+  vars:
+    _users_all_gids: >-
+      {{
+        (uid_registry | dict2items | rejectattr('value.class', 'equalto', 'preexisting') | map(attribute='value.gid') | list)
+        + (gid_registry | default({}) | dict2items | map(attribute='value.gid') | list)
+      }}
+
+- name: Assert each managed user has a registry entry
+  tags:
+    - users
+    - uid_policy
+  ansible.builtin.assert:
+    that:
+      - item.name is defined
+      - item.name in uid_registry
+      - uid_registry[item.name].uid is defined
+      - uid_registry[item.name].gid is defined
+      - uid_registry[item.name].class is defined
+    fail_msg: >-
+      managed_users entry '{{ item.name | default("missing-name") }}' has no
+      complete uid_registry entry. Allocate uid, gid, and class in
+      inventory/group_vars/all/uid_registry.yml first.
+  loop: "{{ managed_users }}"
+  loop_control:
+    label: "{{ item.name | default('missing-name') }}"
+
+- name: Assert each allocation falls inside its class range
+  tags:
+    - users
+    - uid_policy
+  ansible.builtin.assert:
+    that:
+      - _users_entry.uid | int >= _users_range[0] | int
+      - _users_entry.uid | int <= _users_range[1] | int
+      - _users_entry.gid | int == _users_entry.uid | int
+    fail_msg: >-
+      Account '{{ item.name }}' has uid {{ _users_entry.uid }} and gid
+      {{ _users_entry.gid }}, outside the {{ _users_entry.class }} range
+      {{ _users_range }}, or gid does not equal uid. Mark it
+      'class: preexisting' with a documented exemption if the account
+      predates this policy.
+  vars:
+    _users_entry: "{{ uid_registry[item.name] }}"
+    _users_range: >-
+      {{
+        users_uid_range_service
+        if uid_registry[item.name].class == 'service'
+        else users_uid_range_human
+      }}
+  when: uid_registry[item.name].class != 'preexisting'
+  loop: "{{ managed_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Assert shared group IDs fall inside the shared range
+  tags:
+    - users
+    - uid_policy
+  ansible.builtin.assert:
+    that:
+      - item.value.gid | int >= users_gid_range_shared[0] | int
+      - item.value.gid | int <= users_gid_range_shared[1] | int
+    fail_msg: >-
+      Shared group '{{ item.key }}' has gid {{ item.value.gid }}, outside the
+      shared group range {{ users_gid_range_shared }}.
+  loop: "{{ gid_registry | default({}) | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Assert retired accounts are not declared present
+  tags:
+    - users
+    - uid_policy
+  ansible.builtin.assert:
+    that:
+      - not (uid_registry[item.name].retired | default(false))
+    fail_msg: >-
+      Account '{{ item.name }}' is marked retired in uid_registry but still
+      appears in managed_users. A retired number must not be reissued.
+      Remove the entry from managed_users.
+  when: item.state | default('present') == 'present'
+  loop: "{{ managed_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Assert the connection account is not being removed
+  tags:
+    - users
+    - uid_policy
+  ansible.builtin.assert:
+    that:
+      - item.state | default('present') == 'present'
+    fail_msg: >-
+      managed_users declares '{{ item.name }}' absent, but Ansible connects to
+      {{ inventory_hostname }} as that account. Removing it would lock the
+      control node out of this host.
+  when: item.name == ansible_user
+  loop: "{{ managed_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Read current account state from the host
+  tags:
+    - users
+    - uid_policy
+  ansible.builtin.getent:
+    database: passwd
+
+- name: Assert no live UID would change
+  tags:
+    - users
+    - uid_policy
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.getent_passwd[item.name][1] | int == uid_registry[item.name].uid | int
+    fail_msg: >-
+      Account '{{ item.name }}' exists on {{ inventory_hostname }} with uid
+      {{ ansible_facts.getent_passwd[item.name][1] }}, but uid_registry
+      allocates {{ uid_registry[item.name].uid }}. A live UID must never be
+      changed. Adopt the existing number as a documented exemption, or
+      replace the account deliberately.
+  when:
+    - item.name in ansible_facts.getent_passwd
+    - item.state | default('present') == 'present'
+  loop: "{{ managed_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+# Mutation begins here. Nothing above this line changes host state.
+
+- name: Ensure shared groups exist with pinned GIDs
+  tags:
+    - users
+    - uid_policy
+  ansible.builtin.group:
+    name: "{{ item.key }}"
+    gid: "{{ item.value.gid }}"
+    state: present
+  loop: "{{ gid_registry | default({}) | dict2items }}"
+  loop_control:
+    label: "{{ item.key }}"
+
+- name: Ensure per-user primary groups exist with pinned GIDs
+  tags:
+    - users
+    - uid_policy
+  ansible.builtin.group:
+    name: "{{ item.name }}"
+    gid: "{{ uid_registry[item.name].gid }}"
+    state: present
+  when:
+    - item.state | default('present') == 'present'
+    - uid_registry[item.name].class != 'preexisting'
+  loop: "{{ managed_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Ensure managed accounts exist with pinned UIDs
+  tags:
+    - users
+    - uid_policy
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    uid: "{{ uid_registry[item.name].uid }}"
+    group: "{{ item.name }}"
+    groups: "{{ item.groups | default([]) }}"
+    append: true
+    shell: "{{ item.shell | default('/bin/bash') }}"
+    home: "{{ item.home | default('/home/' ~ item.name) }}"
+    create_home: true
+    state: present
+  when:
+    - item.state | default('present') == 'present'
+    - uid_registry[item.name].class != 'preexisting'
+  loop: "{{ managed_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Add managed accounts to the administrative group
+  tags:
+    - users
+    - uid_policy
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    groups: "{{ users_sudo_group }}"
+    append: true
+  when:
+    - users_manage_sudo
+    - item.state | default('present') == 'present'
+    - item.sudo | default(false)
+  loop: "{{ managed_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Ensure preexisting managed accounts retain required supplementary groups
+  tags:
+    - users
+    - uid_policy
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    groups: "{{ item.groups | default([]) }}"
+    append: true
+  when:
+    - item.state | default('present') == 'present'
+    - uid_registry[item.name].class == 'preexisting'
+    - item.groups | default([]) | length > 0
+  loop: "{{ managed_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Set authorized keys for managed accounts
+  tags:
+    - users
+    - uid_policy
+  ansible.posix.authorized_key:
+    user: "{{ item.0.name }}"
+    key: "{{ item.1 }}"
+    state: present
+    manage_dir: true
+    exclusive: "{{ item.0.authorized_keys_exclusive | default(users_authorized_keys_exclusive) }}"
+  when:
+    - users_manage_authorized_keys
+    - item.0.state | default('present') == 'present'
+  loop: "{{ managed_users | subelements('authorized_keys', skip_missing=True) }}"
+  loop_control:
+    label: "{{ item.0.name }}"
+
+- name: Write sudoers entries for accounts granted sudo
+  tags:
+    - users
+    - uid_policy
+  ansible.builtin.copy:
+    content: |
+      {{ item.name }} ALL=(ALL) {{ 'NOPASSWD:' if item.sudo_nopasswd | default(false) else '' }}ALL
+    dest: "/etc/sudoers.d/{{ item.name }}"
+    owner: root
+    group: root
+    mode: "0440"
+    validate: visudo -cf %s
+  when:
+    - users_manage_sudo
+    - item.state | default('present') == 'present'
+    - item.sudo | default(false)
+  loop: "{{ managed_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Remove sudoers entries for accounts without sudo
+  tags:
+    - users
+    - uid_policy
+  ansible.builtin.file:
+    path: "/etc/sudoers.d/{{ item.name }}"
+    state: absent
+  when:
+    - users_manage_sudo
+    - item.state | default('present') == 'present'
+    - not (item.sudo | default(false))
+  loop: "{{ managed_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Remove sudoers entries for accounts being removed
+  tags:
+    - users
+    - uid_policy
+  ansible.builtin.file:
+    path: "/etc/sudoers.d/{{ item.name }}"
+    state: absent
+  when: item.state | default('present') == 'absent'
+  loop: "{{ managed_users }}"
+  loop_control:
+    label: "{{ item.name }}"
+
+- name: Remove accounts declared absent
+  tags:
+    - users
+    - uid_policy
+  ansible.builtin.user:
+    name: "{{ item.name }}"
+    state: absent
+    remove: false
+  when: item.state | default('present') == 'absent'
+  loop: "{{ managed_users }}"
+  loop_control:
+    label: "{{ item.name }}"

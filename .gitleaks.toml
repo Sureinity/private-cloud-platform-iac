@@ -1,0 +1,12 @@
+# Gitleaks configuration for Private Cloud Platform repository
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Ignore local uncommitted operator secret payloads, device configs, and artifacts"
+paths = [
+  '''ansible/infra-ops/secrets/.*''',
+  '''secrets/.*''',
+  '''configs/.*''',
+  '''artifacts/.*''',
+]

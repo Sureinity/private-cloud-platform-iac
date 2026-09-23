@@ -1,0 +1,121 @@
+# SPDX-License-Identifier: MIT-0
+---
+seaweedfs_version: "4.47"
+seaweedfs_arch: "amd64"
+seaweedfs_build_type: "large_disk" # Available convention as of current version: "" (standard), "large_disk", "full_disk"
+seaweedfs_expected_volume_limit: "{{ '8000GB' if 'large_disk' in seaweedfs_build_type else '30GB' }}"
+seaweedfs_os: "linux"
+seaweedfs_archive_name: >-
+  {{
+    seaweedfs_os ~ '_' ~ seaweedfs_arch ~ ('_' ~ seaweedfs_build_type if (seaweedfs_build_type | length > 0) else '') ~ '.tar.gz'
+  }}
+seaweedfs_url: "https://github.com/seaweedfs/seaweedfs/releases/download/{{ seaweedfs_version }}/{{ seaweedfs_archive_name }}"
+seaweedfs_checksum: "99cd686a0b40c00dfe443f8f8a4476c01e90cf3aa0cee1a58f289d6819dba63c"
+
+# Binary installation paths
+seaweedfs_bin_dir: "/usr/local/bin"
+seaweedfs_download_dir: "/tmp"
+seaweedfs_cleanup_archive: true
+
+# Service user and group identity (Stage 3)
+seaweedfs_user: "seaweedfs"
+seaweedfs_group: "seaweedfs"
+seaweedfs_system_user: true
+seaweedfs_user_shell: "/usr/sbin/nologin"
+seaweedfs_user_home: "/var/lib/seaweedfs"
+seaweedfs_user_create_home: true
+seaweedfs_user_home_mode: "0750"
+
+# Preflight requirements and validation definitions
+seaweedfs_supported_os_families:
+  - "Debian"
+
+seaweedfs_supported_distributions:
+  - "Ubuntu"
+  - "Debian"
+
+seaweedfs_supported_architectures:
+  - "x86_64"
+
+# Storage target check (device or mount point)
+# Mode can be 'device' (verifies block device exists, e.g. /dev/sdb) or 'mount' (verifies mount point exists)
+seaweedfs_storage_check_type: "device"
+seaweedfs_data_device: "/dev/sdb"
+seaweedfs_data_mount_point: "/srv/seaweedfs"
+
+# Storage and filesystem configuration (Stage 2)
+# Explicit opt-in override required to format an unformatted disk. Refuses format by default.
+seaweedfs_format_disk: true
+seaweedfs_fs_type: "ext4"
+seaweedfs_mount_options: "defaults,noatime"
+
+# Persistent subdirectories under the mount point
+seaweedfs_data_subdirs:
+  - "master"
+  - "volume"
+  - "filer"
+
+# Directory permissions on persistent storage
+seaweedfs_dir_mode: "0750"
+
+# Port conflict checks
+# 8888 (filer), 9333 (master), 8080 (volume), 8333 (s3)
+seaweedfs_required_ports:
+  - 8888
+  - 9333
+  - 8080
+  - 8333
+
+# Configuration and service settings (Stage 5)
+seaweedfs_config_dir: "/etc/seaweedfs"
+seaweedfs_env_file: "{{ seaweedfs_config_dir }}/seaweedfs.env"
+seaweedfs_s3_config_file: "{{ seaweedfs_config_dir }}/s3.json"
+seaweedfs_filer_config_file: "{{ seaweedfs_config_dir }}/filer.toml"
+
+seaweedfs_service_enabled: true
+seaweedfs_service_state: "started"
+
+# Topology and port configurations
+# -ip specifies the IP address advertised for internal gRPC communication between components
+# -ip.bind specifies the network interface address to listen on
+seaweedfs_ip: "{{ ansible_default_ipv4.address }}"
+seaweedfs_bind_ip: "0.0.0.0"
+seaweedfs_master_port: 9333
+seaweedfs_volume_port: 8080
+seaweedfs_filer_port: 8888
+seaweedfs_s3_port: 8333
+seaweedfs_volume_max: 7
+
+# S3 IAM and authentication settings
+seaweedfs_s3_admin_identity_name: "terraform-admin"
+seaweedfs_s3_admin_access_key: "CHANGE_ME_SEAWEEDFS_ACCESS_KEY"
+seaweedfs_s3_admin_secret_key: "CHANGE_ME_SEAWEEDFS_SECRET_KEY"
+seaweedfs_s3_extra_identities: []
+
+# Optional runtime environment variables (WEED_* variables or overrides)
+seaweedfs_extra_env: {}
+
+# TLS and HTTPS settings (Stage 5b)
+seaweedfs_tls_enabled: false
+seaweedfs_tls_certificate_source: "acme_dns01"  # "acme_dns01", "local_payload", "self_signed"
+seaweedfs_tls_dir: "{{ seaweedfs_config_dir }}/tls"
+
+# S3 HTTPS server configuration
+seaweedfs_s3_enable_http: true
+seaweedfs_s3_port_https: 8334
+seaweedfs_s3_cert_file: "{{ seaweedfs_tls_dir }}/s3.crt"
+seaweedfs_s3_key_file: "{{ seaweedfs_tls_dir }}/s3.key"
+seaweedfs_s3_cacert_file: ""
+seaweedfs_endpoint_hostname: "seaweedfs.example.invalid"
+seaweedfs_s3_external_url: "https://{{ seaweedfs_endpoint_hostname }}:{{ seaweedfs_s3_port_https }}"
+
+# ACME DNS-01 Cloudflare parameters
+seaweedfs_cloudflare_api_token: ""
+seaweedfs_acme_email: "admin@example.invalid"
+seaweedfs_acme_propagation_seconds: 30
+seaweedfs_acme_staging: false
+
+# Local payload certificate source paths (when seaweedfs_tls_certificate_source == 'local_payload')
+seaweedfs_tls_local_cert_src: "{{ playbook_dir }}/../secrets/seaweedfs/tls/s3.crt"
+seaweedfs_tls_local_key_src: "{{ playbook_dir }}/../secrets/seaweedfs/tls/s3.key"
+seaweedfs_tls_local_ca_src: ""
