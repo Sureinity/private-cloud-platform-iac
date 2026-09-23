@@ -71,7 +71,7 @@ jobs:
         run: ./scripts/ci/validate-markdown.sh
 
       - name: Run Gitleaks Secret Detection
-        uses: gitleaks/gitleaks-action@e8913919ad74e1d7d8eeb965074f85e505292eb5 # v2.3.9
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
