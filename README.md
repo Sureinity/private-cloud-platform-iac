@@ -59,6 +59,74 @@ flowchart TD
 
 ---
 
+## Network Architecture & Perimeter Security
+
+The networking model isolates hypervisor administration and internal guest workloads behind a virtualized perimeter firewall, enforcing zero-trust ingress and micro-segmentation.
+
+```mermaid
+flowchart LR
+    subgraph WAN_ZONE["External Uplink Zone"]
+        UPLINK["Physical Uplink / Internet"]
+    end
+
+    subgraph INGRESS["Secure Administrative Ingress"]
+        VPN["WireGuard / Tailscale Mesh"]
+    end
+
+    subgraph APPLIANCE["OPNsense Virtual Appliance (VM 100)"]
+        direction TB
+        WAN_IF["WAN Interface (vmbr0)"]
+        PF["Stateful Packet Filter (pf)"]
+        DNS["Unbound DNS & DHCP"]
+        LAN_GW["LAN Gateway (vmbr1)"]
+        WAN_IF --> PF --> LAN_GW
+        DNS -.-> LAN_GW
+    end
+
+    subgraph INTERNAL["Internal Segments (vmbr1)"]
+        direction TB
+        subgraph MGMT["Management Plane"]
+            PVE_MGMT["PVE Hypervisor Host (192.0.2.10)"]
+            S3_BKND["SeaweedFS S3 Backend (192.0.2.51)"]
+            ZBX_MON["Zabbix Observability (192.0.2.30)"]
+        end
+        subgraph GUESTS_SEG["Workload Segments"]
+            STG_APP["Isolated Staging Guests (VLAN 20)"]
+            FLEET_NODES["Monitored Fleet Guests"]
+        end
+    end
+
+    UPLINK -->|Default Deny WAN| WAN_IF
+    VPN -->|Authenticated Encrypted Tunnel| LAN_GW
+    LAN_GW --> MGMT
+    LAN_GW -->|Inter-VLAN Filter Rules| GUESTS_SEG
+```
+
+### Architectural Principles
+
+1. **Two-Bridge Hypervisor Boundary**:
+   - `vmbr0` (WAN): Attached to the physical NIC for upstream connectivity. The Proxmox VE hypervisor has **no management IP assigned on this bridge**, preventing direct scan exposure from the uplink.
+   - `vmbr1` (Internal LAN): Isolated virtual bridge with no direct physical uplink. All guest virtual machines and the Proxmox VE web/API management interface (`192.0.2.10:8006`) reside exclusively on this internal bridge.
+
+2. **Perimeter Firewall & Routing (OPNsense)**:
+   - Operates as the central default gateway (`192.0.2.1`) and NAT router for all virtualized guests.
+   - External WAN operates under a strict default-deny policy for unsolicited inbound connections.
+   - Local DNS resolution with Unbound DNS host overrides provides internal service discovery.
+
+3. **Zero-Trust Administrative Ingress**:
+   - Hypervisor and appliance management ports are never exposed to the external network.
+   - Remote administration traverses an encrypted **WireGuard / Tailscale mesh** terminating on the firewall, providing authenticated point-to-point management access.
+
+4. **Micro-Segmentation & Egress Control**:
+   - Application workloads operate on isolated VLANs (e.g., VLAN 20) partitioned from the core infrastructure management segment.
+   - Inter-VLAN traffic is inspected via stateful pf packet filtering rules, preventing compromised workloads from pivoting into infrastructure storage or management services.
+
+5. **Declarative Network as Code**:
+   - Network policies (firewall aliases, filter rules, DNS host records) are codified and managed declaratively via **Terraform** (`terraform/live/opnsense`).
+   - Decoupled from hypervisor provisioning state to prevent circular dependencies during reboots or network reconfigurations.
+
+---
+
 ## Core Engineering Highlights
 
 ### 1. Declarative Infrastructure as Code (Terraform)
