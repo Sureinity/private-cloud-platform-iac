@@ -128,7 +128,7 @@ cat ~<username>/.ssh/authorized_keys
 2. **Testing Changes**: Run with `--check --diff` before applying to live hosts.
 
    ```bash
-   ansible-playbook -i inventory/hosts.yml playbooks/site.yml --check --diff --limit <host>
+   ansible-playbook -i inventory/hosts.example.yml playbooks/site.yml --check --diff --limit <host>
    ```
 
 3. **Testing the guards**: Temporarily set a registry UID to 1000 and confirm the run fails at the range assert rather than colliding with the cloud image account.

@@ -114,6 +114,26 @@ n8n_server_ssh_public_keys = [
   "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLEKEYPLACEHOLDER000000000000000000000000000 lab-operator@example.invalid",
 ]
 
+database_vm_id                    = 160
+database_vm_name                  = "db-practice"
+database_vm_cloud_init_datastore_id = "local-lvm"
+database_vm_cloud_init_username   = "ubuntu"
+database_vm_cpu_cores             = 1
+database_vm_disk_datastore_id     = "local-lvm"
+database_vm_efi_disk_datastore_id = "local-lvm"
+database_vm_bios                  = "ovmf"
+database_vm_disk_size_gb          = 16
+database_vm_dns_servers           = ["192.0.2.1"]
+database_vm_ipv4_address          = "192.0.2.60/24"
+database_vm_ipv4_gateway          = "192.0.2.1"
+database_vm_memory_mb             = 1024
+database_vm_started               = true
+database_vm_on_boot               = false
+database_vm_startup_order         = 60
+database_vm_ssh_public_keys = [
+  "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLEKEYPLACEHOLDER000000000000000000000000000 lab-operator@example.invalid",
+]
+
 managed_client_cloud_init_datastore_id = "local-lvm"
 managed_client_cloud_init_username     = "ubuntu"
 managed_client_cpu_cores               = 1

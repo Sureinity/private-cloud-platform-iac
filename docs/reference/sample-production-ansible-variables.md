@@ -2,6 +2,10 @@
 
 This reference defines the non-secret desired state for the SampleApp production VM. The source of truth is `ansible/infra-ops/inventory/hosts.yml` and `ansible/infra-ops/inventory/group_vars/sample_production.yml`. Base role defaults and boundary assertion flags are declared in `ansible/infra-ops/roles/sample_app/defaults/main.yml`.
 
+Related:
+- [Ansible inventory variable ownership](ansible-inventory-variable-ownership.md)
+- [SampleApp staging Ansible variables](sample-staging-ansible-variables.md)
+
 ## Inventory and control path
 
 | Item | Value | Notes |

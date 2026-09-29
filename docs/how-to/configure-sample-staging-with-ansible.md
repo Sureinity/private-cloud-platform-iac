@@ -81,7 +81,7 @@ Expected environment-file output is `root:root 600 /srv/sample-app/.env.staging`
 
 Expected wrapper and GHCR-token output is `root:root 755 /usr/local/sbin/sample-staging-deploy` and `root:root 600 /etc/sample-app/ghcr-pull-token`. The deploy account must have only the exact wrapper command through sudo; it must not be in the `docker` or `sudo` group and must not read `/srv/sample-app/.env.staging`.
 
-Once GitHub Actions deploys the stack, validate separately with the application repository's Compose commands and `https://sample-staging.novaryn.tech/api/health`.
+Once GitHub Actions deploys the stack, validate separately with the application repository's Compose commands and `https://sample-staging.example.invalid/api/health`.
 
 ## Rollback
 

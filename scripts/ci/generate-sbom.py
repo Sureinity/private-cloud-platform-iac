@@ -86,28 +86,35 @@ def extract_python_packages(repo_root: Path) -> list[dict]:
 
 
 def extract_ansible_collections(repo_root: Path) -> list[dict]:
-    """Extracts Ansible Galaxy collections from requirements.yml."""
-    req_file = repo_root / "ansible/infra-ops/requirements.yml"
+    """Extracts Ansible Galaxy collections from requirements.yml files."""
     components = []
-    if not req_file.is_file():
-        return components
+    seen = set()
 
-    content = req_file.read_text(encoding="utf-8")
-    for match in re.finditer(r"-\s*name:\s*([^\s]+)\s*\n\s*version:\s*\"?([^\s\"]+)\"?", content):
-        name = match.group(1)
-        version = match.group(2)
-        components.append({
-            "type": "library",
-            "bom-ref": f"pkg:ansible/{name}@{version}",
-            "name": name,
-            "version": version,
-            "purl": f"pkg:ansible/{name}@{version}",
-            "scope": "required",
-            "properties": [
-                {"name": "platform:ecosystem", "value": "ansible"},
-                {"name": "platform:source_file", "value": "ansible/infra-ops/requirements.yml"},
-            ],
-        })
+    for req_file in sorted(repo_root.glob("ansible/*/requirements.yml")):
+        if not req_file.is_file():
+            continue
+
+        rel_path = str(req_file.relative_to(repo_root))
+        content = req_file.read_text(encoding="utf-8")
+        for match in re.finditer(r"-\s*name:\s*([^\s]+)\s*\n\s*version:\s*\"?([^\s\"]+)\"?", content):
+            name = match.group(1)
+            version = match.group(2)
+            key = (name, version)
+            if key in seen:
+                continue
+            seen.add(key)
+            components.append({
+                "type": "library",
+                "bom-ref": f"pkg:ansible/{name}@{version}",
+                "name": name,
+                "version": version,
+                "purl": f"pkg:ansible/{name}@{version}",
+                "scope": "required",
+                "properties": [
+                    {"name": "platform:ecosystem", "value": "ansible"},
+                    {"name": "platform:source_file", "value": rel_path},
+                ],
+            })
     return sorted(components, key=lambda c: c["name"])
 
 
@@ -115,6 +122,7 @@ def extract_terraform_providers(repo_root: Path) -> list[dict]:
     """Extracts Terraform provider locks across live and bootstrap roots."""
     lockfiles = [
         ("terraform/live/onprem-pve/.terraform.lock.hcl", "live"),
+        ("terraform/live/opnsense/.terraform.lock.hcl", "opnsense"),
         ("terraform/bootstrap/seaweedfs/.terraform.lock.hcl", "bootstrap"),
     ]
     components = []
@@ -307,7 +315,9 @@ def build_evidence_manifest(
     lockfiles_to_hash = [
         ("requirements.txt", "requirements.txt"),
         ("ansible_requirements", "ansible/infra-ops/requirements.yml"),
+        ("ansible_opnsense_requirements", "ansible/opnsense-ops/requirements.yml"),
         ("terraform_live_lock", "terraform/live/onprem-pve/.terraform.lock.hcl"),
+        ("terraform_opnsense_lock", "terraform/live/opnsense/.terraform.lock.hcl"),
         ("terraform_bootstrap_lock", "terraform/bootstrap/seaweedfs/.terraform.lock.hcl"),
         ("tool_versions", "scripts/ci/versions.env"),
         ("seaweedfs_defaults", "ansible/infra-ops/roles/seaweedfs/defaults/main.yml"),

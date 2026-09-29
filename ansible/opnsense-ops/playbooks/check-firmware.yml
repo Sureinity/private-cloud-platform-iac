@@ -1,0 +1,39 @@
+---
+- name: Query OPNsense firmware update status
+  hosts: opnsense
+  gather_facts: false
+  tasks:
+    - name: Load local secrets payload if present
+      ansible.builtin.include_vars:
+        file: "{{ item }}"
+      with_first_found:
+        - files:
+            - "{{ playbook_dir }}/../secrets/vault.yml"
+          skip: true
+      no_log: true
+      run_once: true
+
+    - name: Query firmware status via OPNsense Core API
+      # checkov:skip=CKV_ANSIBLE_1: OPNsense internal management Web GUI operates with internal/self-signed certs
+      # checkov:skip=CKV2_ANSIBLE_1: Target endpoint is strictly HTTPS via inventory opnsense_api_url
+      ansible.builtin.uri:
+        url: "{{ opnsense_api_url }}/api/core/firmware/status"
+        method: POST
+        url_username: "{{ opnsense_api_key }}"
+        url_password: "{{ opnsense_api_secret }}"
+        force_basic_auth: true
+        validate_certs: "{{ opnsense_validate_certs }}"
+        timeout: "{{ opnsense_api_timeout }}"
+        return_content: true
+        status_code: [200]
+      delegate_to: localhost
+      register: firmware_response
+
+    - name: Display current firmware information
+      ansible.builtin.debug:
+        msg: >-
+          Host: {{ inventory_hostname }} |
+          Status: {{ firmware_response.json.status | default('unknown') }} |
+          Product Version: {{ firmware_response.json.product_version | default('N/A') }} |
+          Needs Reboot: {{ firmware_response.json.needs_reboot | default(false) }} |
+          Updates Available: {{ firmware_response.json.updates | default('0') }}

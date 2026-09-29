@@ -1,3 +1,4 @@
 ansible-lint==26.8.0
 checkov==3.3.17
+httpx==0.28.1
 yamllint==1.38.0

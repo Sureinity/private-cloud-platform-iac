@@ -46,6 +46,8 @@ ansible/infra-ops/secrets/**
 
 # Local device and appliance configuration exports may contain secrets
 configs/
+backups/
+**/backups/
 
 # Local Ansible secrets and operator payloads
 **/secrets/*

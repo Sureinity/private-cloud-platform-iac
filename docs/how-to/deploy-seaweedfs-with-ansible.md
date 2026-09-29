@@ -65,8 +65,8 @@ cd ansible/infra-ops
 Confirm that the target host resolves under `seaweedfs_hosts`:
 
 ```bash
-ansible-inventory -i inventory/hosts.yml --graph
-ansible-inventory -i inventory/hosts.yml --host seaweedfs
+ansible-inventory -i inventory/hosts.example.yml --graph
+ansible-inventory -i inventory/hosts.example.yml --host seaweedfs
 ```
 
 ### 2. Syntax and dry-run check

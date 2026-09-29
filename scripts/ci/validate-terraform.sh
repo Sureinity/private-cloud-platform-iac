@@ -29,6 +29,7 @@ terraform fmt -check -recursive
 
 ROOTS=(
   "terraform/live/onprem-pve"
+  "terraform/live/opnsense"
   "terraform/bootstrap/seaweedfs"
 )
 
@@ -56,6 +57,9 @@ fi
 
 if command -v tflint >/dev/null 2>&1; then
   echo "==> [Terraform] Running TFLint..."
+  if [[ -z "${GITHUB_TOKEN:-}" ]] && [[ -n "${TFLINT_GITHUB_TOKEN:-}" ]]; then
+    export GITHUB_TOKEN="${TFLINT_GITHUB_TOKEN}"
+  fi
   tflint --init
   tflint --minimum-failure-severity=error --recursive
 else

@@ -1,0 +1,4 @@
+---
+# Playbooks: playbooks/backup-config.yml, playbooks/check-firmware.yml
+opnsense_api_key: "{{ vault_opnsense_api_key | default('placeholder_api_key') }}"
+opnsense_api_secret: "{{ vault_opnsense_api_secret | default('placeholder_api_secret') }}"

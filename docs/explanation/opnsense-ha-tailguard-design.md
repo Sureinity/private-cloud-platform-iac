@@ -182,6 +182,7 @@ Recommended controls:
    ```
 
 7. Avoid exposing the OPNsense web GUI to the entire tailnet.
+8. Leave management service listeners (such as OpenSSH) configured to listen on **All (recommended)** rather than binding directly to the overlay interface (`tailscale0`). Restricting service socket binding to dynamic or virtual interfaces causes boot-time startup failures due to race conditions with the `os-tailscale` daemon; access control must be enforced via the firewall rules defined above instead. See [Configure OPNsense SSH Service Availability](../how-to/configure-opnsense-ssh-service-availability.md).
 
 ## Failover behavior
 

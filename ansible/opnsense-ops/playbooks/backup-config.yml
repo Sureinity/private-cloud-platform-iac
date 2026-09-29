@@ -1,0 +1,46 @@
+---
+- name: Backup OPNsense configuration
+  hosts: opnsense
+  gather_facts: false
+  tasks:
+    - name: Load local secrets payload if present
+      ansible.builtin.include_vars:
+        file: "{{ item }}"
+      with_first_found:
+        - files:
+            - "{{ playbook_dir }}/../secrets/vault.yml"
+          skip: true
+      no_log: true
+      run_once: true
+
+    - name: Ensure local backup directory exists
+      ansible.builtin.file:
+        path: "{{ opnsense_backup_dir }}"
+        state: directory
+        mode: "0700"
+      delegate_to: localhost
+      run_once: true
+
+    - name: Record current timestamp
+      ansible.builtin.set_fact:
+        backup_timestamp: "{{ lookup('pipe', 'date +%Y%m%d_%H%M%S') }}"
+      run_once: true
+
+    - name: Export active configuration XML via OPNsense backup API
+      # checkov:skip=CKV_ANSIBLE_2: OPNsense internal management Web GUI operates with internal/self-signed certs
+      ansible.builtin.get_url:
+        url: "{{ opnsense_api_url }}/api/core/backup/download/this"
+        url_username: "{{ opnsense_api_key }}"
+        url_password: "{{ opnsense_api_secret }}"
+        force_basic_auth: true
+        dest: "{{ opnsense_backup_dir }}/config-{{ inventory_hostname }}-{{ backup_timestamp }}.xml"
+        mode: "0600"
+        validate_certs: "{{ opnsense_validate_certs }}"
+        timeout: "{{ opnsense_api_timeout }}"
+      delegate_to: localhost
+
+    - name: Verify exported configuration is non-empty XML
+      ansible.builtin.shell:
+        cmd: "head -n 2 {{ opnsense_backup_dir }}/config-{{ inventory_hostname }}-{{ backup_timestamp }}.xml | grep -i '<opnsense>'"
+      delegate_to: localhost
+      changed_when: false

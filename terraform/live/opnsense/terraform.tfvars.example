@@ -1,0 +1,177 @@
+opnsense_url            = "https://192.0.2.1"
+opnsense_api_key        = "placeholder_api_key_for_svc_terraform"
+opnsense_api_secret     = "placeholder_api_secret_for_svc_terraform"
+opnsense_allow_insecure = true
+
+firewall_aliases = {}
+
+unbound_host_overrides = {
+  seaweedfs = {
+    hostname    = "seaweedfs"
+    domain      = "example.invalid"
+    server      = "192.0.2.51"
+    type        = "A"
+    description = "SeaweedFS S3 storage endpoint"
+    enabled     = true
+  }
+}
+
+firewall_filter_rules = {
+  allow_wan_https = {
+    sequence         = 100
+    enabled          = true
+    description      = "Allow to OPNsense HTTPS"
+    interfaces       = ["wan"]
+    action           = "pass"
+    direction        = "in"
+    protocol         = "TCP"
+    ip_protocol      = "inet"
+    quick            = true
+    log              = false
+    source_net       = "any"
+    destination_net  = "(self)"
+    destination_port = "https"
+  }
+  allow_lan_internet = {
+    sequence         = 200
+    enabled          = true
+    description      = "Allow LAN to Internet"
+    interfaces       = ["lan"]
+    action           = "pass"
+    direction        = "in"
+    protocol         = "any"
+    ip_protocol      = "inet"
+    quick            = true
+    log              = false
+    source_net       = "lan"
+    destination_net  = "any"
+  }
+  allow_ssh_tailscale = {
+    sequence         = 300
+    enabled          = true
+    description      = "Allow SSH on Tailscale"
+    interfaces       = ["opt2"]
+    action           = "pass"
+    direction        = "in"
+    protocol         = "TCP"
+    ip_protocol      = "inet"
+    quick            = true
+    log              = false
+    source_net       = "any"
+    destination_net  = "(self)"
+    destination_port = "ssh"
+  }
+  allow_https_tailscale = {
+    sequence         = 400
+    enabled          = true
+    description      = "Allow HTTPS (GUI) on Tailscale"
+    interfaces       = ["opt2"]
+    action           = "pass"
+    direction        = "in"
+    protocol         = "TCP"
+    ip_protocol      = "inet"
+    quick            = true
+    log              = false
+    source_net       = "any"
+    destination_net  = "(self)"
+    destination_port = "https"
+  }
+  block_sample_lan_wan = {
+    sequence         = 450
+    enabled          = true
+    description      = "Block SAMPLE_NET on LAN & WAN network"
+    interfaces       = ["opt3"]
+    action           = "block"
+    direction        = "in"
+    protocol         = "any"
+    ip_protocol      = "inet"
+    quick            = true
+    log              = true
+    source_net       = "opt3"
+    destination_net  = "lan,wan"
+  }
+  block_sample_home_net = {
+    sequence         = 462
+    enabled          = true
+    description      = "Block SAMPLE_NET to Home Network"
+    interfaces       = ["opt3"]
+    action           = "block"
+    direction        = "in"
+    protocol         = "any"
+    ip_protocol      = "inet"
+    quick            = true
+    log              = true
+    source_net       = "opt3"
+    destination_net  = "203.0.113.0/24"
+  }
+  block_sample_pve = {
+    sequence         = 475
+    enabled          = true
+    description      = "Block SAMPLE_NET on PVE Host"
+    interfaces       = ["opt3"]
+    action           = "block"
+    direction        = "in"
+    protocol         = "any"
+    ip_protocol      = "inet"
+    quick            = true
+    log              = true
+    source_net       = "opt3"
+    destination_net  = "192.0.2.10"
+  }
+  block_sample_opnsense_host = {
+    sequence         = 581
+    enabled          = true
+    description      = "Block SAMPLE_NET on OPNsense Host"
+    interfaces       = ["opt3"]
+    action           = "block"
+    direction        = "in"
+    protocol         = "any"
+    ip_protocol      = "inet"
+    quick            = true
+    log              = true
+    source_net       = "opt3"
+    destination_net  = "(self)"
+  }
+  block_sample_opt1 = {
+    sequence         = 615
+    enabled          = true
+    description      = "Block SAMPLE_NET to OPT1 Network"
+    interfaces       = ["opt3"]
+    action           = "block"
+    direction        = "in"
+    protocol         = "any"
+    ip_protocol      = "inet"
+    quick            = true
+    log              = true
+    source_net       = "opt3"
+    destination_net  = "opt1"
+  }
+  allow_sample_catchall = {
+    sequence         = 650
+    enabled          = true
+    description      = "Catch-all allow for SAMPLE_NET"
+    interfaces       = ["opt3"]
+    action           = "pass"
+    direction        = "in"
+    protocol         = "any"
+    ip_protocol      = "inet"
+    quick            = true
+    log              = false
+    source_net       = "any"
+    destination_net  = "any"
+  }
+  allow_sample_ipv6_catchall = {
+    sequence         = 800
+    enabled          = false
+    description      = "Catch-all allow for SAMPLE_NET IPV6"
+    interfaces       = ["opt3"]
+    action           = "pass"
+    direction        = "in"
+    protocol         = "any"
+    ip_protocol      = "inet6"
+    quick            = true
+    log              = false
+    source_net       = "any"
+    destination_net  = "any"
+  }
+}

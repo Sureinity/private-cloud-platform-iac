@@ -61,3 +61,15 @@ output "managed_client_vm_names" {
     for role, vm in module.managed_clients : role => vm.vm_name
   }
 }
+
+output "database_vm_id" {
+  value = module.database_vm.vm_id
+}
+
+output "database_vm_name" {
+  value = module.database_vm.vm_name
+}
+
+output "database_vm_ipv4_address" {
+  value = var.database_vm_ipv4_address
+}

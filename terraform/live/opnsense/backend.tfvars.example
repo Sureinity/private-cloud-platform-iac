@@ -1,0 +1,2 @@
+access_key = "opnsense_operator"
+secret_key = "change_me_to_real_seaweedfs_s3_secret"

@@ -1,0 +1,11 @@
+---
+# Connection variables belong to Ansible Core; opnsense_* variables belong to OPNsense playbooks
+all:
+  children:
+    opnsense:
+      hosts:
+        opnsense-primary:
+          ansible_host: "192.0.2.1"
+          opnsense_api_url: "https://192.0.2.1"
+          opnsense_validate_certs: false
+          ansible_connection: local

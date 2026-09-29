@@ -1,0 +1,6 @@
+---
+collections:
+  - name: oxlorg.opnsense
+    version: "26.1.11"
+  - name: community.general
+    version: "10.4.0"

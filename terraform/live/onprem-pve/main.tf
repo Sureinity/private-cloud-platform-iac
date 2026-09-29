@@ -298,3 +298,39 @@ module "managed_clients" {
     },
   ]
 }
+
+module "database_vm" {
+  source = "../../modules/proxmox_vm"
+
+  target_node_name        = var.target_node_name
+  vm_id                   = var.database_vm_id
+  vm_name                 = var.database_vm_name
+  description             = "Practice database VM for MySQL or PostgreSQL management"
+  disk_datastore_id       = var.database_vm_disk_datastore_id
+  efi_disk_datastore_id   = var.database_vm_efi_disk_datastore_id
+  cloud_init_datastore_id = var.database_vm_cloud_init_datastore_id
+  cloud_init_enabled      = true
+  cloud_init_username     = var.database_vm_cloud_init_username
+  cloud_init_password     = local.cloud_init_password
+  cpu_cores               = var.database_vm_cpu_cores
+  disk_size_gb            = var.database_vm_disk_size_gb
+  import_image_file_id    = module.images.import_images.ubuntu.file_id
+  ipv4_address            = var.database_vm_ipv4_address
+  ipv4_gateway            = var.database_vm_ipv4_gateway
+  dns_servers             = var.database_vm_dns_servers
+  memory_mb               = var.database_vm_memory_mb
+  operating_system_type   = "l26"
+  ssh_public_keys         = var.database_vm_ssh_public_keys
+  startup_order           = var.database_vm_startup_order
+  started                 = var.database_vm_started
+  on_boot                 = var.database_vm_on_boot
+  bios                    = var.database_vm_bios
+  tags                    = ["ubuntu", "database", "practice"]
+  network_devices = [
+    {
+      bridge   = var.opnsense_lan_bridge_name
+      model    = "virtio"
+      firewall = true
+    },
+  ]
+}

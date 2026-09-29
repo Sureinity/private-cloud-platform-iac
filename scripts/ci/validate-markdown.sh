@@ -64,7 +64,11 @@ for md in md_files:
             if not target or target.startswith(("http://", "https://", "mailto:", "file://", "tel:")):
                 continue
             
-            target_path = (md.parent / target).resolve()
+            if target.startswith("/"):
+                target_path = (repo_root / target.lstrip("/")).resolve()
+            else:
+                target_path = (md.parent / target).resolve()
+
             if not target_path.exists():
                 errors.append(f"{md.relative_to(repo_root)}:{idx}: Broken relative link '{target}'")
 

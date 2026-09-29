@@ -1,4 +1,5 @@
 ---
+# Role: roles/seaweedfs
 # Non-secret desired state for SeaweedFS cluster hosts.
 # Secret credentials (S3 keys) must be supplied via Ansible Vault,
 # extra-vars, or local secret payloads, never committed in plaintext.

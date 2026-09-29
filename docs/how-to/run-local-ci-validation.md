@@ -49,7 +49,7 @@ Verifies code formatting across all files, initializes all roots (`terraform/liv
 ./scripts/ci/validate-terraform.sh
 ```
 
-*Note: If `tflint` reports warnings (e.g. unused variable declarations), they are printed as informational items; only errors block execution.*
+*Note: If `tflint` reports warnings (e.g. unused variable declarations), they are printed as informational items; only errors block execution. To protect against GitHub API rate limits during plugin initialization (`tflint --init`), plugins are cached in `~/.tflint.d/plugins` and an optional `GITHUB_TOKEN` or `TFLINT_GITHUB_TOKEN` environment variable can be provided.*
 
 ### 3. Ansible linting and syntax verification
 

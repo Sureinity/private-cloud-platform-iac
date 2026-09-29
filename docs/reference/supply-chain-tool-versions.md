@@ -17,6 +17,13 @@ This reference documents the pinned tool versions, lockfiles, and environment ma
 - **Bootstrap `bpg/proxmox` provider version:** `0.113.1` (`~> 0.108`)
 - **Target platforms:** `linux_amd64`, `linux_arm64`, `darwin_arm64`
 
+- **OPNsense configuration root:** `terraform/live/opnsense/versions.tf`
+- **OPNsense modules:** `terraform/modules/opnsense_alias/`, `terraform/modules/opnsense_filter_rule/`, `terraform/modules/opnsense_unbound_host/`
+- **OPNsense dependency lockfile:** `terraform/live/opnsense/.terraform.lock.hcl`
+- **Terraform core version:** `= 1.10.5`
+- **`browningluke/opnsense` provider version:** `= 0.26.0`
+- **Target platforms:** `linux_amd64`, `linux_arm64`, `darwin_arm64`
+
 #### Provider lock update command
 
 ```bash
@@ -29,6 +36,11 @@ terraform -chdir=terraform/bootstrap/seaweedfs providers lock \
   -platform=linux_amd64 \
   -platform=linux_arm64 \
   -platform=darwin_arm64
+
+terraform -chdir=terraform/live/opnsense providers lock \
+  -platform=linux_amd64 \
+  -platform=linux_arm64 \
+  -platform=darwin_arm64
 ```
 
 ### 2. Ansible collection dependencies
@@ -37,10 +49,16 @@ terraform -chdir=terraform/bootstrap/seaweedfs providers lock \
 - **Collection:** `ansible.posix`
 - **Version:** `2.1.0`
 
+- **File:** `ansible/opnsense-ops/requirements.yml`
+- **Collections:**
+  - `oxlorg.opnsense: 26.1.11` (1:1 pinned release for OPNsense 26.1.11)
+  - `community.general: 10.4.0`
+
 #### Installation command
 
 ```bash
 ansible-galaxy collection install -r ansible/infra-ops/requirements.yml
+ansible-galaxy collection install -r ansible/opnsense-ops/requirements.yml
 ```
 
 ### 3. TFLint and ruleset plugins
@@ -56,6 +74,13 @@ ansible-galaxy collection install -r ansible/infra-ops/requirements.yml
 tflint --init
 tflint --recursive
 ```
+
+#### GitHub API rate-limit resilience
+
+`tflint --init` discovers and downloads plugin rulesets from GitHub releases (`github.com/terraform-linters/tflint-ruleset-terraform`). Unauthenticated requests to GitHub API share an IP rate limit of 60 requests per hour, which can fail concurrent CI workflow triggers with HTTP 403 rate-limit errors. To ensure high reliability across multi-trigger workflows:
+
+1. **Plugin Caching:** Workflows execute `actions/cache` targeting `~/.tflint.d/plugins` keyed by `tflint-plugins-${{ runner.os }}-${{ hashFiles('.tflint.hcl') }}`. When plugins exist locally, `tflint --init` detects them and makes zero GitHub API network requests.
+2. **Authenticated Requests:** `GITHUB_TOKEN` is passed to the `terraform-linters/setup-tflint` action (`github_token: ${{ secrets.GITHUB_TOKEN }}`) and into the execution environment of `scripts/ci/validate-terraform.sh` (`GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}`), granting up to 1,000 requests per hour on cache misses.
 
 ### 4. CI binaries and security scanners
 
@@ -80,6 +105,7 @@ tflint --recursive
 |---|---|---|
 | `ansible-lint` | `26.8.0` | Ansible best-practices and playbook linter |
 | `checkov` | `3.3.17` | IaC security and compliance scanner |
+| `httpx` | `0.28.1` | HTTP client library for OPNsense REST API automation |
 | `yamllint` | `1.38.0` | YAML syntax and formatting validator |
 
 #### Installation command
@@ -95,6 +121,7 @@ python3 -m pip install -r requirements.txt
 | Action | Pinned Commit SHA | Tag | Purpose |
 |---|---|---|---|
 | `actions/checkout` | `11bd71901bbe5b1630ceea73d27597364c9af683` | `v4.2.2` | Checkout git repository |
+| `actions/cache` | `0057852bfaa89a56745cba8c7296529d2fc39830` | `v4.3.0` | Cache TFLint plugins and pipeline artifacts |
 | `hashicorp/setup-terraform` | `b9cd54a3c349d3f38e8881555d616ced269862dd` | `v3.1.2` | Install pinned Terraform CLI |
 | `terraform-linters/setup-tflint` | `90f302c255ef959cbfb4bd10581afecdb7ece3e6` | `v4.1.1` | Install pinned TFLint engine |
 | `actions/setup-python` | `42375524e23c412d93fb67b49958b491fce71c38` | `v5.4.0` | Setup Python runtime for linters |

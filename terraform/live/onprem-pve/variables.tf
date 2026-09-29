@@ -788,3 +788,107 @@ variable "sample_staging_server_ssh_public_keys" {
   default     = []
   description = "Non-secret SSH public keys injected into the initial cloud-image account. Do not add private keys or passwords."
 }
+
+variable "database_vm_id" {
+  type        = number
+  default     = 160
+  description = "Proxmox VMID for the practice database VM."
+}
+
+variable "database_vm_name" {
+  type        = string
+  default     = "db-practice"
+  description = "Proxmox guest name and hostname for the practice database VM."
+}
+
+variable "database_vm_cloud_init_datastore_id" {
+  type        = string
+  default     = "local-lvm"
+  description = "Datastore for the database VM cloud-init drive."
+}
+
+variable "database_vm_bios" {
+  type        = string
+  default     = "ovmf"
+  description = "Firmware for the database VM (ovmf enables UEFI boot)."
+}
+
+variable "database_vm_efi_disk_datastore_id" {
+  type        = string
+  default     = "local-lvm"
+  description = "Datastore for the database VM EFI disk."
+}
+
+variable "database_vm_cloud_init_username" {
+  type        = string
+  default     = "ubuntu"
+  description = "Initial cloud-init administrative username."
+}
+
+variable "database_vm_cpu_cores" {
+  type        = number
+  default     = 1
+  description = "Number of vCPU cores allocated to the practice database VM (low resource envelope)."
+}
+
+variable "database_vm_disk_datastore_id" {
+  type        = string
+  default     = "local-lvm"
+  description = "Target datastore ID for the root disk."
+}
+
+variable "database_vm_disk_size_gb" {
+  type        = number
+  default     = 16
+  description = "Root disk size in GiB for the practice database VM."
+}
+
+variable "database_vm_dns_servers" {
+  type        = list(string)
+  default     = ["192.0.2.1"]
+  description = "DNS resolvers for the practice database VM."
+}
+
+variable "database_vm_ipv4_address" {
+  type        = string
+  default     = "192.0.2.60/24"
+  description = "Static IPv4 CIDR address on the OPNsense LAN bridge (vmbr1)."
+}
+
+variable "database_vm_ipv4_gateway" {
+  type        = string
+  default     = "192.0.2.1"
+  description = "Default gateway address on the OPNsense LAN bridge (vmbr1)."
+}
+
+variable "database_vm_memory_mb" {
+  type        = number
+  default     = 1024
+  description = "RAM allocated to the practice database VM in MiB (low resource envelope)."
+}
+
+variable "database_vm_on_boot" {
+  type        = bool
+  default     = false
+  description = "Whether to start the practice database VM automatically on Proxmox host boot."
+}
+
+variable "database_vm_started" {
+  type        = bool
+  default     = true
+  description = "Whether the VM should be running after Terraform provisioning."
+}
+
+variable "database_vm_startup_order" {
+  type        = number
+  default     = 60
+  description = "Proxmox boot startup order (starts after core networking and services)."
+}
+
+variable "database_vm_ssh_public_keys" {
+  type = list(string)
+  default = [
+    "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEXAMPLEKEYPLACEHOLDER000000000000000000000000000 lab-operator@example.invalid",
+  ]
+  description = "Public SSH keys injected into the cloud-init user."
+}

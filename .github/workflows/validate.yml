@@ -50,16 +50,25 @@ jobs:
         with:
           terraform_version: "1.10.5"
 
+      - name: Cache TFLint plugins
+        uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        with:
+          path: ~/.tflint.d/plugins
+          key: tflint-plugins-${{ runner.os }}-${{ hashFiles('.tflint.hcl') }}
+
       - name: Set up TFLint
-        uses: terraform-linters/setup-tflint@800ef091eb9ebc095e78ec54191396a94ed82d5a # v4.1.1
+        uses: terraform-linters/setup-tflint@90f302c255ef959cbfb4bd10581afecdb7ece3e6 # v4.1.1
         with:
           tflint_version: "v0.55.0"
+          github_token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Validate Repository Hygiene
         run: ./scripts/ci/validate-hygiene.sh
 
       - name: Validate Terraform
         run: ./scripts/ci/validate-terraform.sh
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Validate Ansible
         run: ./scripts/ci/validate-ansible.sh

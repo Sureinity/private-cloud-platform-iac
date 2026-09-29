@@ -1,0 +1,4 @@
+---
+# Playbooks: playbooks/backup-config.yml, playbooks/check-firmware.yml
+opnsense_backup_dir: "{{ playbook_dir }}/../backups"
+opnsense_api_timeout: 30

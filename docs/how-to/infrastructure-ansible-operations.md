@@ -37,3 +37,10 @@ ansible-playbook playbooks/users.yml --check --diff --limit <host>
 ## Rollback notes
 
 Zabbix Agent 2 removal and user removal should be deliberate, host-scoped changes rather than a rollback of `playbooks/site.yml`.
+
+## Related
+
+- [Ansible inventory variable ownership](../reference/ansible-inventory-variable-ownership.md)
+- [UID/GID allocation policy](../reference/uid-gid-allocation-policy.md)
+- [SampleApp staging Ansible variables](../reference/sample-staging-ansible-variables.md)
+- [SampleApp production Ansible variables](../reference/sample-production-ansible-variables.md)

@@ -1,4 +1,5 @@
 ---
+# Role: roles/zabbix_agent2
 zabbix_server_address: "192.0.2.30"
 zabbix_agent_hostname: "{{ inventory_hostname }}"
 zabbix_agent2_enable_active_check: true

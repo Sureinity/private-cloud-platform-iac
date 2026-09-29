@@ -73,7 +73,7 @@ Then verify Ansible connectivity from the project:
 
 ```bash
 cd ansible/infra-ops
-ansible 'zbx-client-*' -i inventory/hosts.yml -m ping
+ansible 'zbx-client-*' -i inventory/hosts.example.yml -m ping
 ```
 
 ## Agent 2 configuration intent

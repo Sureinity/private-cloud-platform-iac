@@ -18,3 +18,4 @@ Run Ansible commands from the relevant project subdirectory so each project can 
 | Project | Purpose |
 |---|---|
 | `infra-ops/` | General On-Premises PVE operations: user lifecycle, SSH daemon hardening, Docker Engine baseline, Zabbix Agent 2, and SampleApp application VM baseline (staging and production). |
+| `opnsense-ops/` | OPNsense firewall appliance operations: configuration backups (`config.xml`), firmware audit queries, and operational Day-2 maintenance tasks. |

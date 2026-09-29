@@ -6,13 +6,25 @@
 [![Security: Trivy](https://img.shields.io/badge/Security-Trivy-brightgreen.svg)](#security-and-supply-chain)
 [![Security: Checkov](https://img.shields.io/badge/Security-Checkov-brightgreen.svg)](#security-and-supply-chain)
 
-Production-grade Infrastructure as Code (IaC), guest configuration management, and automated supply-chain governance for a virtualized on-premises Proxmox VE environment.
+Automated private cloud platform featuring declarative Infrastructure as Code (IaC), centralized configuration management, network perimeter security, and continuous supply-chain governance for virtualized Proxmox VE environments.
+
+---
+
+## Platform at a Glance
+
+| Focus Area | Technologies & Tools | Key Practical Implementation |
+|---|---|---|
+| **Infrastructure as Code** | **Terraform**, Proxmox VE Provider | Parameterized modules for bridges, cloud images, and VMs with decoupled S3 remote state. |
+| **Network & Firewall** | **OPNsense**, WireGuard / Tailscale | Declarative firewall rules, inter-VLAN isolation, and Unbound DNS host overrides. |
+| **Configuration Management**| **Ansible**, Python | Modular roles for Docker, SSH hardening, user lifecycle, and central UID/GID governance. |
+| **Storage & Observability** | **SeaweedFS S3**, **Zabbix** | S3-compatible remote backend storage and distributed Zabbix Agent 2 fleet monitoring. |
+| **DevSecOps CI/CD** | **GitHub Actions**, Gitleaks, Checkov, Trivy | Multi-scanner automated validation, CycloneDX SBOM generation, and audited security exceptions. |
 
 ---
 
 ## Architecture Overview
 
-This platform manages virtualized compute, storage, isolated networking, and application delivery on Proxmox VE (PVE). Guest lifecycle is orchestrated declaratively with **Terraform**, post-provisioning and host operations are managed with **Ansible**, and supply-chain integrity is verified with a comprehensive multi-scanner CI pipeline.
+This platform manages virtualized compute, storage, isolated networking, and application delivery on Proxmox VE (PVE). Hypervisor resources and network firewall policies are orchestrated declaratively with **Terraform**, guest operations are configured with **Ansible**, and system health is tracked with **Zabbix**.
 
 ```text
 +-----------------------------------------------------------------------------------+
@@ -50,23 +62,22 @@ This platform manages virtualized compute, storage, isolated networking, and app
 
 ---
 
-## Key Capabilities
+## Core Engineering Highlights
 
 ### 1. Declarative Infrastructure as Code (Terraform)
-- **Reusable Modules**: Isolated, parameterized modules for Linux bridges (`terraform/modules/bridges`), Proxmox cloud-image provisioning (`terraform/modules/images`), VM definitions (`terraform/modules/proxmox_vm`), and USB passthrough mapping (`terraform/modules/usb_resource_mapping`).
-- **Bootstrap Root**: Dedicated standalone bootstrap root (`terraform/bootstrap/seaweedfs`) provisioning an S3-compatible SeaweedFS object storage VM for remote state without circular dependencies.
-- **Environment Composition**: Live environment root (`terraform/live/onprem-pve`) managing network bridges, guest VMs, boot order, and cloud-init credentials.
-- **Provider Multi-Platform Locks**: Deterministic provider lockfiles (`.terraform.lock.hcl`) supporting `linux_amd64`, `linux_arm64`, and `darwin_arm64`.
+- **Reusable Modules**: Isolated, parameterized modules for Linux bridges (`terraform/modules/bridges`), Proxmox cloud-image provisioning (`terraform/modules/images`), VM definitions (`terraform/modules/proxmox_vm`), and OPNsense firewall configuration (`terraform/modules/opnsense_*`).
+- **Decoupled State Management**: Dedicated standalone bootstrap root (`terraform/bootstrap/seaweedfs`) for S3-compatible remote state, with separate live roots for hypervisor guests (`terraform/live/onprem-pve`) and firewall rules (`terraform/live/opnsense`) to eliminate circular dependencies.
+- **Multi-Platform Locks**: Deterministic provider lockfiles (`.terraform.lock.hcl`) supporting `linux_amd64`, `linux_arm64`, and `darwin_arm64`.
 
 ### 2. Configuration Management & Fleet Operations (Ansible)
 - **Modular Roles**: Reusable roles for Docker engine setup, SSH daemon hardening, system user creation, SeaweedFS S3 storage clustering, and Zabbix Agent 2 monitoring fleet rollout.
 - **Deterministic UID/GID Allocation**: Central numeric identity registry (`inventory/group_vars/all/uid_registry.yml`) preventing privilege collisions across Linux guests.
-- **Least-Privilege Deployments**: Role-tailored service accounts and restricted sudo wrappers for automated container deployments.
+- **Dedicated Appliance Operations**: Standalone OPNsense operations project (`ansible/opnsense-ops`) providing automated XML configuration backups and firmware health checks via REST API.
 
 ### 3. Supply-Chain Security & Local CI Parity
-- **Static Multi-Scanner Pipeline**: Runs `gitleaks` (secret scanning), `trivy` (IaC misconfigurations), `checkov` (policy adherence), `tflint` (Terraform linter), `ansible-lint`, `shellcheck`, and `yamllint`.
-- **Security Exception Registry**: Audited, schema-enforced exception catalog (`security/exceptions/`) with mandatory expiration dates and rationale.
-- **CycloneDX SBOM & Evidence Manifest**: Automated Software Bill of Materials (SBOM) generation (`scripts/ci/generate-sbom.py`) cataloging lockfiles, dependencies, and SHA-256 integrity digests.
+- **Static Multi-Scanner Pipeline**: Runs `gitleaks` (secret scanning), `trivy` (misconfigurations), `checkov` (policy adherence), `tflint` (Terraform linter), `ansible-lint`, `shellcheck`, and `yamllint`.
+- **Security Exception Registry**: Audited, schema-enforced exception catalog (`security/exceptions/`) with mandatory expiration dates and technical rationale.
+- **CycloneDX SBOM & Evidence Manifest**: Automated Software Bill of Materials generation (`scripts/ci/generate-sbom.py`) cataloging lockfiles, dependencies, and SHA-256 integrity digests.
 
 ---
 
@@ -74,20 +85,18 @@ This platform manages virtualized compute, storage, isolated networking, and app
 
 ```text
 .github/workflows/          Static GitHub Actions CI pipelines
-ansible/infra-ops/       Ansible orchestration root
-  inventory/                Inventory group variables and example hosts
-  playbooks/                Guest orchestration playbooks
-  roles/                    Reusable configuration roles (docker, ssh, users, etc.)
-docs/                       Diataxis documentation
-  explanation/              Architecture, security model, and design records
-  how-to/                   Task-oriented operational procedures
-  reference/                Input variables, tool versions, and policies
+ansible/
+  infra-ops/                Guest configuration roles (docker, ssh, users, zabbix, seaweedfs)
+  opnsense-ops/             OPNsense appliance operational maintenance & backups
+docs/                       Diataxis documentation (architecture, how-to guides, reference)
 scripts/ci/                 Local CI parity validation scripts and scanners
 security/exceptions/        Audited security exception registry
 terraform/
   bootstrap/seaweedfs/      Standalone S3 backend VM bootstrap root
-  live/onprem-pve/          Environment-specific composition
-  modules/                  Reusable Terraform modules (bridges, vm, images, usb)
+  live/
+    onprem-pve/             Environment-specific compute & networking composition
+    opnsense/               Decoupled declarative OPNsense firewall state
+  modules/                  Reusable Terraform modules (bridges, vm, images, opnsense)
 tests/ci/                   Unit tests for CI evaluators and schemas
 ```
 
@@ -95,23 +104,22 @@ tests/ci/                   Unit tests for CI evaluators and schemas
 
 ## Sanitization & Synthetic Data Notice
 
-This repository is a curated, history-free public export of an operational on-premises environment. To protect operational security:
-- **IP Addressing**: All host addresses, gateways, and subnets use official RFC 5737 (`192.0.2.0/24`, `198.51.100.0/24`) and RFC 3849 (`2001:db8::/32`) test ranges.
+This repository is a curated public export of an operational on-premises environment. To protect operational security:
+- **IP Addressing**: All host addresses, gateways, and subnets use official RFC 5737 (`192.0.2.0/24`, `198.51.100.0/24`, `203.0.113.0/24`) and RFC 3849 (`2001:db8::/32`) test ranges.
 - **Domains**: All domain names use the reserved `.example.invalid` pseudo-TLD (RFC 2606 / RFC 6761).
-- **Credentials & Keys**: All API tokens, passwords, and SSH keys have been replaced with invalid dummy placeholders.
+- **Credentials & Keys**: All API tokens, passwords, and SSH keys have been replaced with non-functional dummy placeholders.
 - **Workloads**: Application payloads and private client references have been generalized into neutral architectural patterns.
-- **No Live Access**: Defaults in this repository cannot target the live host or private environment.
 
-For full architectural and security details, see [`docs/explanation/sanitized-architecture-and-security-model.md`](docs/explanation/sanitized-architecture-and-security-model.md).
+For architectural and security details, see [`docs/explanation/sanitized-architecture-and-security-model.md`](docs/explanation/sanitized-architecture-and-security-model.md).
 
 ---
 
 ## Local Validation Quickstart
 
-To run the full suite of static security scans, linting, and formatting checks locally:
+To run the complete static validation suite locally (linting, format, security scans, and SBOM generation):
 
 ```bash
-# 1. Install prerequisites (Python, Terraform, TFLint, Gitleaks, Checkov, Trivy)
+# 1. Install prerequisites
 pip install -r requirements.txt
 
 # 2. Run master validation suite
