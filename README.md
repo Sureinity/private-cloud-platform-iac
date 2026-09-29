@@ -26,38 +26,35 @@ Automated private cloud platform featuring declarative Infrastructure as Code (I
 
 This platform manages virtualized compute, storage, isolated networking, and application delivery on Proxmox VE (PVE). Hypervisor resources and network firewall policies are orchestrated declaratively with **Terraform**, guest operations are configured with **Ansible**, and system health is tracked with **Zabbix**.
 
-```text
-+-----------------------------------------------------------------------------------+
-| Proxmox Virtual Environment (PVE) Host                                            |
-|                                                                                   |
-|  +--------------------+         +----------------------------------------------+  |
-|  | Physical NIC (WAN) |         | Management & Isolated Guest Segment (vmbr1)  |  |
-|  | (vmbr0)            |         | 192.0.2.0/24 (RFC 5737 Test Subnet)          |  |
-|  +---------+----------+         +----------------------+-----------------------+  |
-|            |                                           |                          |
-|  +---------v-------------------------------------------v-----------------------+  |
-|  | OPNsense Virtual Router & Firewall (Appliance ID 100)                       |  |
-|  | - WAN Interface on vmbr0                                                   |  |
-|  | - LAN Gateway (192.0.2.1) on vmbr1                                         |  |
-|  | - WireGuard Admin Mesh / Isolated VLAN Segments                             |  |
-|  +-----------------------------------------------------------------------------+  |
-|            |                                                                      |
-|  +---------v-------------------------------------------------------------------+  |
-|  | Managed Infrastructure Guests (Attached to vmbr1 behind OPNsense)           |  |
-|  |                                                                             |  |
-|  |  +------------------------+  +------------------------+                     |  |
-|  |  | SeaweedFS S3 Backend   |  | Zabbix Observability   |                     |  |
-|  |  | ID 151 (192.0.2.51)     |  | Monolith ID 130        |                     |  |
-|  |  | S3 State / Data Store  |  | Fleet Monitoring       |                     |  |
-|  |  +------------------------+  +------------------------+                     |  |
-|  |                                                                             |  |
-|  |  +------------------------+  +------------------------+                     |  |
-|  |  | Staging Application    |  | Monitored Linux Fleet  |                     |  |
-|  |  | ID 142 (VLAN Isolated) |  | IDs 133-136            |                     |  |
-|  |  | Docker / Cloud-Init    |  | Zabbix Agent 2 Clients |                     |  |
-|  |  +------------------------+  +------------------------+                     |  |
-|  +-----------------------------------------------------------------------------+  |
-+-----------------------------------------------------------------------------------+
+```mermaid
+flowchart TD
+    subgraph PVE["Proxmox Virtual Environment (PVE) Host"]
+        subgraph NET["Host Bridges"]
+            WAN["Physical NIC (vmbr0)"]
+            LAN["Internal Bridge (vmbr1 - 192.0.2.0/24)"]
+        end
+
+        subgraph ROUTER["Perimeter Security"]
+            OPN["OPNsense Router & Firewall (VM 100)"]
+        end
+
+        subgraph GUESTS["Isolated Infrastructure Guests"]
+            S3["SeaweedFS S3 Remote State (VM 151)"]
+            ZBX["Zabbix Observability Server (VM 130)"]
+            STG["Sample Staging Application (VM 142)"]
+            FLEET["Monitored Linux Fleet (VM 133-136)"]
+        end
+    end
+
+    WAN -->|WAN Uplink| OPN
+    OPN -->|Default Gateway 192.0.2.1| LAN
+    LAN --> S3
+    LAN --> ZBX
+    LAN --> STG
+    LAN --> FLEET
+
+    FLEET -.->|Telemetry| ZBX
+    OPN -.->|SNMP / Agent Monitoring| ZBX
 ```
 
 ---
