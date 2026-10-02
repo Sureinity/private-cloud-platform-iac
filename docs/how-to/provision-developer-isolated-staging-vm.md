@@ -42,7 +42,7 @@ The staging VM is a dedicated application host. It runs the dedicated SampleApp 
 ```text
 Public tester
      |
-     | HTTPS: sample-staging.example.invalid
+     | HTTPS: sample-staging.novaryn.tech
      v
 Cloudflare edge
      | TLS, WAF, rate controls
@@ -71,12 +71,12 @@ Provision the VM to run the staging stack defined in the SampleApp application r
 
 | Item | Required staging value or behavior |
 | --- | --- |
-| Public hostname | `sample-staging.example.invalid` |
+| Public hostname | `sample-staging.novaryn.tech` |
 | Cloudflare tunnel | Named tunnel `sample-staging`, configured in Cloudflare Zero Trust as a Docker connector. |
 | Tunnel origin | `http://sample-app:3002` |
 | Runtime services | `cloudflared`, `sample-app`, and `postgres` only. |
 | Docker network | `sample-staging-internal`; no host-published application or database ports. |
-| Public URL configuration | `APP_PUBLIC_URL=https://sample-staging.example.invalid` and `SAMPLE_HOST=sample-staging.example.invalid`. |
+| Public URL configuration | `APP_PUBLIC_URL=https://sample-staging.novaryn.tech` and `ATELIER_HOST=sample-staging.novaryn.tech`. |
 | Database connection | `postgresql://sample-app_user:<password>@postgres:5432/sample-app_db?schema=public` for both `DATABASE_URL` and `DIRECT_URL` when the Compose database is used. |
 | Image source | `ghcr.io/zeraynce-studio/sample-app:staging`, with immutable `staging-<short-sha>` tags for rollback. |
 | Initial access policy | Public through the Cloudflare hostname; Cloudflare Access is deferred by decision and must be introduced before broader or sensitive external access. |
@@ -99,7 +99,7 @@ docker compose --env-file .env.staging -f docker-compose.staging.yml logs --tail
 docker compose --env-file .env.staging -f docker-compose.staging.yml exec sample-app wget -qO- http://127.0.0.1:3002/api/health
 ```
 
-The Cloudflare Tunnel dashboard must report a healthy connector, and `https://sample-staging.example.invalid/api/health` must return a successful response. No router port-forwarding or inbound VM firewall opening is required for `80`, `443`, `3002`, or `5432`.
+The Cloudflare Tunnel dashboard must report a healthy connector, and `https://sample-staging.novaryn.tech/api/health` must return a successful response. No router port-forwarding or inbound VM firewall opening is required for `80`, `443`, `3002`, or `5432`.
 
 No inbound WAN port forwarding is required for the application. The Cloudflare Tunnel connector initiates outbound connections from the VM to Cloudflare. Do not expose the PVE host or the VM SSH service publicly to make deployment or app ingress work.
 
@@ -171,22 +171,22 @@ As of August 22, 2026, the first staging network path is implemented and validat
 | Component | Current configuration |
 | --- | --- |
 | PVE bridge | `vmbr1` is VLAN-aware. |
-| Staging VLAN | VLAN tag `60`, named `SAMPLE_STAGING_VLAN60` in OPNsense. |
+| Staging VLAN | VLAN tag `60`, named `ATELIER_STAGING_VLAN60` in OPNsense. |
 | VLAN parent | OPNsense LAN parent `vtnet1`, which carries the existing untagged `192.0.2.0/24` management/lab segment. |
-| OPNsense staging interface | `vlan01`, assigned as `SAMPLE_STAGING` (`opt3`), enabled with static IPv4 `10.0.60.1/24`. IPv6 is disabled. |
+| OPNsense staging interface | `vlan01`, assigned as `ATELIER_STAGING` (`opt3`), enabled with static IPv4 `10.0.60.1/24`. IPv6 is disabled. |
 | Staging guest | `sample-staging-01` (VMID `142`) connects to `vmbr1` with VLAN tag `60` and uses `10.0.60.10/24` with gateway `10.0.60.1`. |
 | Layer-2 validation | `arping` from `sample-staging-01` receives replies from `10.0.60.1`; OPNsense packet capture on `vtnet1` shows VLAN-60 ARP requests and replies. |
 
-The OPNsense VLAN was created with parent `vtnet1`, VLAN tag `60`, and description `SAMPLE_STAGING_VLAN60`. The assigned interface does not enable OPNsense's `Block private networks` or `Block bogon networks` settings. Those settings are inappropriate for this internal RFC1918 VLAN and can break intended local operation.
+The OPNsense VLAN was created with parent `vtnet1`, VLAN tag `60`, and description `ATELIER_STAGING_VLAN60`. The assigned interface does not enable OPNsense's `Block private networks` or `Block bogon networks` settings. Those settings are inappropriate for this internal RFC1918 VLAN and can break intended local operation.
 
-The current `SAMPLE_STAGING` interface rule order contains these blocks before a temporary broad pass rule:
+The current `ATELIER_STAGING` interface rule order contains these blocks before a temporary broad pass rule:
 
 1. Block staging access to the OPNsense `LAN network` and `WAN network` objects. In this topology, the WAN network is the directly connected upstream home-router subnet; this blocks access to that home segment without blocking general Internet egress.
-2. Block staging access to `203.0.113.0/24`.
+2. Block staging access to `192.168.50.0/24`.
 3. Block staging access to the PVE host at `192.0.2.10`.
 4. Block staging access to all services on `This Firewall`.
 5. Block staging access to the `OPT1 network`.
-6. Pass `SAMPLE_STAGING network` to any destination and port, described as a temporary catch-all testing rule.
+6. Pass `ATELIER_STAGING network` to any destination and port, described as a temporary catch-all testing rule.
 
 The final pass rule is knowingly unsafe as a lasting policy. It permits every destination and service not caught by the preceding blocks, including any future or unlisted private network. It exists only while the service dependencies are being discovered and must be removed before staging is treated as a dependable environment.
 
@@ -360,7 +360,7 @@ For the initial implementation:
 - Do not configure Let’s Encrypt, ACME state, inbound HTTP validation, or router port forwarding for this staging deployment.
 - Keep `cloudflared`, `sample-app`, and `postgres` on the private `sample-staging-internal` Docker network.
 - Terminate public TLS at Cloudflare initially; use Cloudflare-to-origin HTTP only on the private Docker network.
-- Create the named, remotely managed tunnel `sample-staging` and map `sample-staging.example.invalid` to `http://sample-app:3002`; never reuse a production tunnel credential.
+- Create the named, remotely managed tunnel `sample-staging` and map `sample-staging.novaryn.tech` to `http://sample-app:3002`; never reuse a production tunnel credential.
 - Store its connector token as `CLOUDFLARE_TUNNEL_TOKEN` only in the protected `.env.staging` file. Never commit it, include it in an image, or give it to the developer by default.
 
 Cloudflare Access is deferred for the initial staging launch. Treat the hostname as public, maintain Cloudflare WAF/rate controls, and enable Access with an explicit allow-list before broader external testing or sensitive staging data is introduced.
@@ -418,7 +418,7 @@ Before granting developer or public tester access, verify all of the following:
 [ ] No inbound WAN port forwarding exists for the VM application or SSH service.
 [ ] Cloudflare Tunnel `sample-staging` reaches `sample-app:3002` without public VM ports.
 [ ] `docker compose --env-file .env.staging -f docker-compose.staging.yml config` succeeds and renders no host `ports:` mappings.
-[ ] `cloudflared`, `sample-app`, and `postgres` are healthy, and `https://sample-staging.example.invalid/api/health` succeeds.
+[ ] `cloudflared`, `sample-app`, and `postgres` are healthy, and `https://sample-staging.novaryn.tech/api/health` succeeds.
 [ ] Cloudflare Access is either explicitly deferred or enabled with a documented allow-list before sensitive/broader external access.
 [ ] Application health endpoint, deployment smoke test, monitoring, backups, and a restore test are documented and working.
 ```
@@ -438,9 +438,9 @@ The following work is required before this VM should be described as a dependabl
 
 ### Network and PVE
 
-- Replace the temporary OPNsense `SAMPLE_STAGING` catch-all pass rule with reviewed, minimal egress allows and a final logged deny.
+- Replace the temporary OPNsense `ATELIER_STAGING` catch-all pass rule with reviewed, minimal egress allows and a final logged deny.
 - Create and document OPNsense aliases for management, home-LAN, HA/pfsync/configuration-sync, transit, and other RFC1918 networks. Use those aliases in logged block rules rather than relying on individual host blocks.
-- Record the complete OPNsense interface-to-subnet map, including WAN, LAN, `SAMPLE_STAGING`, `OPT1`, HA, pfsync, configuration-sync, and transit interfaces. Do not record public addresses, credentials, or secrets.
+- Record the complete OPNsense interface-to-subnet map, including WAN, LAN, `ATELIER_STAGING`, `OPT1`, HA, pfsync, configuration-sync, and transit interfaces. Do not record public addresses, credentials, or secrets.
 - Decide whether VLAN 60 is static-address-only or has DHCP. If DHCP is enabled, document its pool, reservations, exclusions, DNS, lease policy, and the reserved address for `sample-staging-01`.
 - Document the PVE firewall state for VM `142` and OPNsense VM `100`, including whether it remains enabled, what it protects, and the VLAN traffic validation required after any change.
 - Add a recovery procedure for VLAN 60 connectivity: check guest address/route, verify PVE NIC tag and bridge VLAN membership, verify OPNsense `vtnet1.60`/`vlan01`, capture ARP on `vtnet1`, and restart only the OPNsense guest when interface changes need reinitialization. Do not restart PVE networking remotely as part of routine diagnosis.
@@ -472,13 +472,13 @@ The following work is required before this VM should be described as a dependabl
 
 - Deploy the SampleApp repository's `docker-compose.staging.yml` from the chosen application checkout path. Its only staging services are `cloudflared`, `sample-app`, and `postgres`; it must not publish `80`, `443`, `3002`, or `5432` on the VM.
 - Use the protected, untracked runtime file `<sample-app-checkout>/.env.staging` with mode `0600`. It contains `CLOUDFLARE_TUNNEL_TOKEN`, `POSTGRES_PASSWORD`, `DATABASE_URL`, `DIRECT_URL`, `AUTH_SECRET`, `SESSION_SECRET`, and integration secrets where enabled. Never commit or expose its values through Terraform, Ansible inventory, CI logs, or Docker image build arguments.
-- Configure the named Cloudflare Tunnel `sample-staging` with public hostname `sample-staging.example.invalid` and HTTP origin `http://sample-app:3002`. Keep the connector token only in `.env.staging`; do not use a credentials JSON file or local `cert.pem` for this token-managed deployment.
-- Keep `SAMPLE_HOST=sample-staging.example.invalid` and `APP_PUBLIC_URL=https://sample-staging.example.invalid` in `.env.staging` so OAuth callbacks, email links, and server redirects use the public Cloudflare origin.
+- Configure the named Cloudflare Tunnel `sample-staging` with public hostname `sample-staging.novaryn.tech` and HTTP origin `http://sample-app:3002`. Keep the connector token only in `.env.staging`; do not use a credentials JSON file or local `cert.pem` for this token-managed deployment.
+- Keep `ATELIER_HOST=sample-staging.novaryn.tech` and `APP_PUBLIC_URL=https://sample-staging.novaryn.tech` in `.env.staging` so OAuth callbacks, email links, and server redirects use the public Cloudflare origin.
 - Back up the named `sample-staging-postgres-data` Docker volume as VM-local application data. Treat it separately from Cloudflare R2 and document its restore verification before relying on the staging database.
 - Define the protected runtime secret file and non-secret release-state file. Specify which local account may read each file and whether the deploy account invokes a constrained command rather than reading secrets directly.
 - Implement the GitHub Actions deployment design: environment protections, OIDC/Tailscale identity, dedicated deploy account, pinned SSH host key, GHCR credential scope, serialized deployment lock, immutable image tags, smoke test, and rollback command.
 - Run database migrations manually after deployment with `docker compose --env-file .env.staging -f docker-compose.staging.yml run --rm sample-app sh -lc 'DATABASE_URL="$DIRECT_URL" npx prisma migrate deploy'`; do not run migrations automatically at app startup.
-- Enable Cloudflare Access later, before staging holds sensitive data or serves broader external QA. It should be configured as a perimeter gate for `sample-staging.example.invalid` and does not replace SampleApp's application login.
+- Enable Cloudflare Access later, before staging holds sensitive data or serves broader external QA. It should be configured as a perimeter gate for `sample-staging.novaryn.tech` and does not replace SampleApp's application login.
 
 ### Monitoring, backup, and incident recovery
 

@@ -1,54 +1,57 @@
----
-# ==============================================================================
-# .github/workflows/validate.yml
-#
-# Master static CI workflow for Private Cloud Platform IaC & Automation.
-# Runs 100% static validation without requiring live Proxmox credentials.
-# ==============================================================================
-
-name: Validate Repository
+name: Validate
 
 on:
   push:
-    branches: ["main"]
+    branches:
+      - main
   pull_request:
-    branches: ["main"]
-  workflow_dispatch:
+    branches:
+      - main
 
 permissions:
   contents: read
 
-jobs:
-  validate:
-    name: Linting, Security, and IaC Verification
-    runs-on: ubuntu-latest
-    steps:
-      - name: Harden Runner Security
-        uses: step-security/harden-runner@cb605e52c26070c3284c4562f0f4a1ba8bed1692 # v2.10.4
-        with:
-          egress-policy: audit
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
-      - name: Checkout Code
+jobs:
+  hygiene:
+    name: Repository Hygiene
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
         uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
         with:
-          fetch-depth: 0
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Run hygiene validation
+        run: ./scripts/ci/validate-hygiene.sh
+
+  terraform:
+    name: Terraform Format, Validate & Lint
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
           persist-credentials: false
 
-      - name: Set up Python
-        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
-        with:
-          python-version: "3.11"
-          cache: "pip"
-
-      - name: Install Python Dependencies
+      - name: Source tool versions
+        id: versions
         run: |
-          python3 -m pip install --upgrade pip
-          pip install -r requirements.txt
+          source scripts/ci/versions.env
+          echo "tf_version=${TERRAFORM_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "tflint_version=${TFLINT_VERSION}" >> "$GITHUB_OUTPUT"
 
-      - name: Set up Terraform
+      - name: Setup Terraform
         uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3.1.2
         with:
-          terraform_version: "1.10.5"
+          terraform_version: ${{ steps.versions.outputs.tf_version }}
+          terraform_wrapper: false
 
       - name: Cache TFLint plugins
         uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
@@ -56,39 +59,177 @@ jobs:
           path: ~/.tflint.d/plugins
           key: tflint-plugins-${{ runner.os }}-${{ hashFiles('.tflint.hcl') }}
 
-      - name: Set up TFLint
+      - name: Setup TFLint
         uses: terraform-linters/setup-tflint@90f302c255ef959cbfb4bd10581afecdb7ece3e6 # v4.1.1
         with:
-          tflint_version: "v0.55.0"
+          tflint_version: "v${{ steps.versions.outputs.tflint_version }}"
           github_token: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Validate Repository Hygiene
-        run: ./scripts/ci/validate-hygiene.sh
-
-      - name: Validate Terraform
+      - name: Run Terraform validation
         run: ./scripts/ci/validate-terraform.sh
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Validate Ansible
+  ansible:
+    name: Ansible Lint & Syntax Check
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Python dependencies
+        run: pip install -r requirements.txt
+
+      - name: Install Ansible Galaxy collections
+        run: |
+          ansible-galaxy collection install -r ansible/infra-ops/requirements.yml
+          if [ -f ansible/opnsense-ops/requirements.yml ]; then
+            ansible-galaxy collection install -r ansible/opnsense-ops/requirements.yml
+          fi
+
+      - name: Run Ansible validation
         run: ./scripts/ci/validate-ansible.sh
 
-      - name: Validate Shell Scripts
+  shell:
+    name: Shell Scripts Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Run ShellCheck & syntax checks
         run: ./scripts/ci/validate-shell.sh
 
-      - name: Validate Markdown and Links
+  markdown:
+    name: Markdown & Links Validation
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: "3.12"
+
+      - name: Run Markdown validation
         run: ./scripts/ci/validate-markdown.sh
 
-      - name: Run Gitleaks Secret Detection
-        uses: gitleaks/gitleaks-action@e8913919ad74e1d7d8eeb965074f85e505292eb5 # v2.3.9
+  security:
+    name: Security Scans (Gitleaks, Trivy & Checkov)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Source tool versions
+        id: versions
+        run: |
+          source scripts/ci/versions.env
+          echo "gitleaks_version=${GITLEAKS_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "trivy_version=${TRIVY_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_VERSION: ${{ steps.versions.outputs.gitleaks_version }}
 
-      - name: Validate Security Scans (Checkov & Exception Registry)
+      - name: Setup Trivy
+        uses: aquasecurity/setup-trivy@81e514348e19b6112ce2a7e3ecbafe19c1e1f567 # v0.3.1
+        with:
+          version: "v${{ steps.versions.outputs.trivy_version }}"
+          cache: true
+
+      - name: Setup Python for Checkov
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: "3.12"
+          cache: "pip"
+
+      - name: Install Checkov
+        run: pip install -r requirements.txt
+
+      - name: Validate security exception registry
+        run: ./scripts/ci/validate-exceptions.sh
+
+      - name: Run security scans
         run: ./scripts/ci/validate-security.sh
 
-      - name: Validate Supply Chain Evidence and SBOM
+  workflows:
+    name: Workflow Security & Syntax
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Source tool versions
+        id: versions
+        run: |
+          source scripts/ci/versions.env
+          echo "actionlint_version=${ACTIONLINT_VERSION}" >> "$GITHUB_OUTPUT"
+          echo "zizmor_version=${ZIZMOR_VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Run actionlint
+        uses: eifinger/actionlint-action@1fc89649be682d16ec5cf65ea16e269eb88d3982 # v1.10.2
+        with:
+          version: ${{ steps.versions.outputs.actionlint_version }}
+
+      - name: Run zizmor
+        uses: zizmorcore/zizmor-action@cc914d7f3750a2d13d75c7f184a1060aa0e9d482 # v0.6.4
+        with:
+          version: ${{ steps.versions.outputs.zizmor_version }}
+          advanced-security: false
+          annotations: true
+
+  evidence:
+    name: SBOM & Evidence Manifest
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          persist-credentials: false
+
+      - name: Setup Python
+        uses: actions/setup-python@42375524e23c412d93fb67b49958b491fce71c38 # v5.4.0
+        with:
+          python-version: "3.12"
+
+      - name: Generate & validate SBOM and evidence manifest
         run: ./scripts/ci/validate-evidence.sh
 
-      - name: Validate Security Exception Registry
-        run: ./scripts/ci/validate-exceptions.sh
+      - name: Upload supply-chain evidence artifacts
+        uses: actions/upload-artifact@4cec3d8aa04e39d1a68397de0c4cd6fb9dce8ec1 # v4.6.1
+        with:
+          name: supply-chain-evidence
+          path: |
+            artifacts/sbom.cdx.json
+            artifacts/evidence-manifest.json
+          retention-days: 90

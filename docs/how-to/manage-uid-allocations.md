@@ -26,25 +26,25 @@ Run every command in this guide read-only or with `--check --diff` first. Do not
 Run from `ansible/infra-ops/`. These commands read host state and change nothing.
 
 ```bash
-ansible all -i inventory/hosts.example.yml -m ansible.builtin.shell \
+ansible all -i inventory/hosts.yml -m ansible.builtin.shell \
   -a "getent passwd | awk -F: '\$3 >= 1000 && \$3 < 65534 {print \$1, \$3, \$4}'" \
   -e ansible_become=false
 ```
 
 ```bash
-ansible all -i inventory/hosts.example.yml -m ansible.builtin.shell \
+ansible all -i inventory/hosts.yml -m ansible.builtin.shell \
   -a "getent group | awk -F: '\$3 >= 1000 && \$3 < 65534 {print \$1, \$3}'" \
   -e ansible_become=false
 ```
 
 ```bash
-ansible all -i inventory/hosts.example.yml -m ansible.builtin.shell \
+ansible all -i inventory/hosts.yml -m ansible.builtin.shell \
   -a "getent group docker || echo 'no docker group'" \
   -e ansible_become=false
 ```
 
 ```bash
-ansible all -i inventory/hosts.example.yml -m ansible.builtin.shell \
+ansible all -i inventory/hosts.yml -m ansible.builtin.shell \
   -a "cat /etc/subuid /etc/subgid 2>/dev/null || echo none" \
   -e ansible_become=false
 ```
@@ -113,7 +113,7 @@ Do not use the `docker` group for this. Its GID differs per host.
 2. Identify files it owns before removing it, so ownership can be reassigned deliberately:
 
    ```bash
-   ansible <host> -i inventory/hosts.example.yml -m ansible.builtin.shell \
+   ansible <host> -i inventory/hosts.yml -m ansible.builtin.shell \
      -a "find / -xdev -uid <uid> -printf '%p\n' 2>/dev/null | head -50"
    ```
 

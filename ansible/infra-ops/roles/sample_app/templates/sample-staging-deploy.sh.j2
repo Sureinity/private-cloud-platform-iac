@@ -62,7 +62,7 @@ cleanup() {
 }
 trap cleanup EXIT
 
-printf 'SAMPLE_IMAGE=%s\nSAMPLE_IMAGE_TAG=%s\n' "${IMAGE_REPOSITORY}" "${image_tag}" > "${temporary_release_state}"
+printf 'ATELIER_IMAGE=%s\nATELIER_IMAGE_TAG=%s\n' "${IMAGE_REPOSITORY}" "${image_tag}" > "${temporary_release_state}"
 install -o root -g root -m 0640 "${temporary_release_state}" "${RELEASE_STATE_FILE}"
 
 set -a

@@ -3,7 +3,7 @@ terraform {
     bucket   = "sample-tfstate"
     key      = "live/onprem-pve/terraform.tfstate"
     region   = "us-east-1"
-    endpoint = "http://192.0.2.51:8333"
+    endpoint = "https://seaweedfs.example.invalid:8334"
 
     # SeaweedFS S3 compatibility requirements
     use_path_style              = true

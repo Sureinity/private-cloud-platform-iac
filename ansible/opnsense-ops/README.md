@@ -8,7 +8,7 @@ This independent Ansible project manages Day-2 operations, imperative maintenanc
 ansible/opnsense-ops/
 ├── ansible.cfg              # Local project Ansible configuration
 ├── inventory/
-│   ├── hosts.example.yml            # OPNsense targets and API connection parameters
+│   ├── hosts.yml            # OPNsense targets and API connection parameters
 │   └── group_vars/
 │       ├── all.yml          # Global defaults (backup paths, timeouts)
 │       └── opnsense.yml     # API credentials mapping

@@ -46,7 +46,7 @@ systemctl status sshd
 1. **Adding new SSH configuration options**: Update `defaults/main.yml` with the new variable and a safe default. Then, add the configuration line to the `sshd_config` template or task (e.g., using `ansible.builtin.lineinfile` or a `template`).
 2. **Testing Changes**: Run the playbook with `--check --diff` before applying changes to live hosts to verify the `sshd_config` modifications.
    ```bash
-   ansible-playbook -i inventory/hosts.example.yml playbooks/configure_ssh.yml --check --diff
+   ansible-playbook -i inventory/hosts.yml playbooks/configure_ssh.yml --check --diff
    ```
 
 ### Idempotency Expectations

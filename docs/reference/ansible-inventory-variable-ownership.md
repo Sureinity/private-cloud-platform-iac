@@ -24,7 +24,7 @@ Related:
 | `ansible_host` | `inventory/hosts.yml` | Ansible Core (`ansible.builtin`) | N/A (Core) | Target host IP address or hostname for SSH / connection transport |
 | `ansible_user` | `inventory/hosts.yml` | Ansible Core (`ansible.builtin`) | N/A (Core) | Remote login user account for SSH connection |
 | `ansible_ssh_private_key_file` | `inventory/hosts.yml` | Ansible Core (`ansible.builtin`) | N/A (Core) | Path to SSH private key used for authentication |
-| `ansible_connection` | `opnsense-ops/inventory/hosts.example.yml` | Ansible Core (`ansible.builtin`) | N/A (Core) | Transport plugin type (e.g. `local` for localhost execution) |
+| `ansible_connection` | `opnsense-ops/inventory/hosts.yml` | Ansible Core (`ansible.builtin`) | N/A (Core) | Transport plugin type (e.g. `local` for localhost execution) |
 | `managed_users` | `group_vars/all/users.yml`, `group_vars/sample-app_*.yml` | `roles/users` | `roles/users/defaults/main.yml` | List of managed system user accounts, groups, shells, sudo privileges, and SSH keys |
 | `uid_registry` | `group_vars/all/uid_registry.yml` | `roles/users` | `roles/users/defaults/main.yml` | Authoritative mapping of account names to static UID/GID numbers |
 | `gid_registry` | `group_vars/all/uid_registry.yml` | `roles/users` | `roles/users/defaults/main.yml` | Mapping of shared group names to static GID allocations |
@@ -77,8 +77,8 @@ Related:
 | `sample_app_ansible_manages_*` | `group_vars/sample-app_*.yml` | `roles/sample_app` | `roles/sample_app/defaults/main.yml` | Boundary assertion flags (DNS, firewall, NTP, deployment, reboot) |
 | `sample_app_monitoring_enabled` | `group_vars/sample-app_*.yml` | `roles/sample_app` | `roles/sample_app/defaults/main.yml` | Boundary assertion flag for Zabbix monitoring inclusion |
 | `sample_app_*_ssh_public_keys` | `group_vars/sample-app_*.yml` | `roles/local_secrets` / `roles/users` | N/A (Secrets payload) | Public keys loaded via `local_secrets` and passed to `managed_users` |
-| `opnsense_api_url` | `opnsense-ops/inventory/hosts.example.yml` | OPNsense Playbooks | N/A (Playbooks) | URL of the OPNsense REST API endpoint |
-| `opnsense_validate_certs` | `opnsense-ops/inventory/hosts.example.yml` | OPNsense Playbooks | N/A (Playbooks) | TLS certificate validation toggle for OPNsense Web GUI API |
+| `opnsense_api_url` | `opnsense-ops/inventory/hosts.yml` | OPNsense Playbooks | N/A (Playbooks) | URL of the OPNsense REST API endpoint |
+| `opnsense_validate_certs` | `opnsense-ops/inventory/hosts.yml` | OPNsense Playbooks | N/A (Playbooks) | TLS certificate validation toggle for OPNsense Web GUI API |
 | `opnsense_api_key` | `opnsense-ops/inventory/group_vars/opnsense.yml` | OPNsense Playbooks | N/A (Playbooks) | API key credential for OPNsense operations |
 | `opnsense_api_secret` | `opnsense-ops/inventory/group_vars/opnsense.yml` | OPNsense Playbooks | N/A (Playbooks) | API secret credential for OPNsense operations |
 | `opnsense_backup_dir` | `opnsense-ops/inventory/group_vars/all.yml` | `playbooks/backup-config.yml` | N/A (Playbook) | Local target directory for exported OPNsense backup XMLs |

@@ -6,7 +6,7 @@ This document explains the security boundaries, sanitization policies, design de
 
 ## Purpose and Scope
 
-`private-cloud-platform-iac` is an open reference architecture for on-premises virtualization and DevOps operations. It demonstrates modular Infrastructure as Code, automated configuration management, and supply-chain governance without exposing private network topology, real cryptographic material, or active management planes.
+`private-cloud-platform-iac` is an open reference architecture for on-premises virtualization and DevOps operations. It demonstrates production-grade Infrastructure as Code, automated configuration management, and supply-chain governance without exposing private network topology, real cryptographic material, or active management planes.
 
 ---
 

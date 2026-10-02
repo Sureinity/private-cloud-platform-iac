@@ -269,7 +269,7 @@ cd ansible/opnsense-ops
 Before making major network changes or applying upgrades, export the active XML configuration:
 
 ```bash
-ansible-playbook -i inventory/hosts.example.yml playbooks/backup-config.yml
+ansible-playbook -i inventory/hosts.yml playbooks/backup-config.yml
 ```
 
 Backups are saved to `ansible/opnsense-ops/backups/config-opnsense-primary-<timestamp>.xml`. The `backups/` directory is automatically ignored by Git to protect system secrets.
@@ -279,7 +279,7 @@ Backups are saved to `ansible/opnsense-ops/backups/config-opnsense-primary-<time
 Query update availability non-disruptively:
 
 ```bash
-ansible-playbook -i inventory/hosts.example.yml playbooks/check-firmware.yml
+ansible-playbook -i inventory/hosts.yml playbooks/check-firmware.yml
 ```
 
 ---

@@ -7,7 +7,7 @@ Step-by-step procedure to provision the low-resource practice database VM (`db-p
 - Access to Proxmox VE via management endpoint (`192.0.2.10:8006` or Tailscale).
 - Local Terraform environment configured in `terraform/live/onprem-pve/`.
 - SSH key `secrets/ssh_keys/priv/home-vm` present locally for guest access.
-- Reference baseline: `../reference/database-vm-allocation.md`.
+- Reference baseline: ``../reference/database-vm-allocation.md``.
 
 ## Step 1: Provision the database VM via Terraform
 
