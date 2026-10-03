@@ -6,7 +6,7 @@
 # Backend block is defined in backend.tf:
 #   bucket   = "sample-tfstate"
 #   key      = "live/onprem-pve/terraform.tfstate"
-#   endpoint = "http://192.0.2.51:8333"
+#   endpoint = "https://seaweedfs.example.invalid:8334"
 #
 # Credentials location:
 #   Ansible secrets payload at ansible/infra-ops/secrets/seaweedfs/admin.yml:
